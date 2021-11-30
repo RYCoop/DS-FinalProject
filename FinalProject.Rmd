@@ -40,7 +40,21 @@ What will we be doing? Methods, techniques, why?
 
 ### Data Cleaning
 
+A brief look at the raw data can be found below.
+
+```{r, echo = FALSE}
+# Import the raw data
+majors_raw <- read.csv("/Users/rachael/Documents/School/Fall 2021/DS 3001/Final Project/recent-grads.csv")
+DT::datatable(majors_raw)
+```
 ```{r}
+str(majors_raw)
+```
+As can be seen above, many of the categories are integer values. Many of these variables can be converted into factor variables in addition to the numerical ones. In addition, the categorical variable categories can be compressed in order for more useful data for the analysis.
+
+```{r}
+# Changing Categorical Variables into Factor Variables
+
 
 ```
 
