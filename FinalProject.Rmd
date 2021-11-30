@@ -1,0 +1,90 @@
+---
+title: "Final Project"
+author: "Rachael Cooper, Sarah Gould, Nathan Patton, Samarth Saxena"
+date: "11/29/2021"
+output: 
+  html_document:
+    toc: TRUE
+    toc_depth: 5
+    toc_float: TRUE
+    tod_collapsed: TRUE
+    theme: cosmo
+  editor_options:
+    chunk_output_type: console
+    
+---
+
+```{r setup, include=FALSE, cache=TRUE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+# cache --> only have to recompile the changes
+# eval --> runs the code
+# echo --> display the code
+```
+
+```{r, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(knitr)
+library(plotly)
+library(DT)
+```
+
+### Introduction 
+
+### Background Information
+
+### Process Overview
+
+What will we be doing? Methods, techniques, why?
+
+### Data Cleaning
+
+```{r}
+
+```
+
+### Exploratory Data Analysis
+
+Initial summary statistics and graphs with an emphasis on variables you believe to be important for your analysis. 
+
+```{r}
+
+```
+
+### Data Vizualization
+
+```{r}
+
+```
+
+### Model Building
+
+```{r}
+
+```
+
+### Prediction
+
+```{r}
+
+```
+
+### Evaluation
+
+```{r}
+
+```
+
+### Fairness Assesment
+
+### Conclusion
+
+What can you say about the results of the methods section as it relates to your question given the limitations to your model?
+
+### Future Recommendations
+
+What additional analysis is needed or what limited your analysis on this project?
+
+
+
