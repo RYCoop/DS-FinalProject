@@ -2,6 +2,8 @@
 
 Group Members: Rachael Cooper, Sarah Gould, Nathan Patton, Samarth Saxena
 
+Question: Based on recent graduates and their characteristics/education, what would be their predicted median salary? Would they make over or less than six figures?
+
 # College Majors
 
 This folder contains the data and code behind the story [The Economic Guide To Picking A College Major](https://fivethirtyeight.com/features/the-economic-guide-to-picking-a-college-major/).
