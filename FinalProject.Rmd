@@ -28,11 +28,26 @@ library(ggplot2)
 library(knitr)
 library(plotly)
 library(DT)
+library(tidyverse)
+library(randomForest)
+library(rio)
+library(mltools)
+library(data.table)
+library(caret)
+library(pROC)
 ```
 
-### Introduction 
+### Introduction
+
+Many colleges want to optimize the money they receive from their alumni. In order to do so, they need to identify and predict the salary/unemployment rate of recent graduates based on their education and other various factors. Doing so, they will be able to put more money into those programs to get a larger return on their investments (students).
+
+Business Question: Where can colleges put money in order to optimize the amount of money they receive from recent graduates?
+
+Analysis Question: Based on recent graduates and their characteristics/education, what would be their predicted median salary? Would they make over or less than six figures?
 
 ### Background Information
+
+What about the data do we need to know...
 
 ### Process Overview
 
@@ -50,12 +65,47 @@ DT::datatable(majors_raw)
 ```{r}
 str(majors_raw)
 ```
-As can be seen above, many of the categories are integer values. Many of these variables can be converted into factor variables in addition to the numerical ones. In addition, the categorical variable categories can be compressed in order for more useful data for the analysis.
+```{r}
+# Remove rows with missing data
+majors_raw <- na.omit(majors_raw)
+
+# Remove 
+```
+
+As can be seen above, many of the categories are integer values. Many of these variables can be converted into factor variables in addition to the numerical ones. In addition, the variables Rank, Major Code, and Major can be dropped as the Rank variable highly correlates with the salary variable, and the other two are to specific and cannot be generalized.
 
 ```{r}
+majors_added_categorical <- majors_raw %>% mutate(Over.50K = ifelse(Median > 50000, "Over", "Under.Equal"), High.Unemployment = ifelse(Unemployment_rate > 0.5, "High", "Low")) %>% select(-1, -2, -3)
+```
+
+In addition, the categorical variable categories can be compressed in order for more useful data for the analysis.
+
+```{r}
+table(majors_factors$Major_category)
+```
+```{r}
 # Changing Categorical Variables into Factor Variables
+majors_factors <- majors_added_categorical %>% mutate_if(sapply(majors_added_categorical, is.character), as.factor)
 
+# Collapsing Factors
+majors <- majors_factors$Major_category <- fct_collapse(majors_factors$Major_category,
+                             Arts = c("Arts", "Humanities & Liberal Arts", "Industrial Arts & Consumer Services"),
+                             Sciences = c("Agriculture & Natural Resources", "Biology & Life Science", "Health", "Physical Sciences", "Social Science"),
+                             STEM = c("Computers & Mathematics", "Engineering"),
+                             Other = c("Interdisciplinary", "Education", "Psychology & Social Work", "Communications & Journalism", "Business", "Law & Public Policy"))
+```
 
+```{r}
+table(majors_factors$Major_category)
+```
+In order to do some analysis, all categorical variables need to be one hot encoded, which is done below:
+
+```{r}
+# One Hot Encoded Data
+majors_onehot <- one_hot(data.table(majors_factors), cols = c("Major_category", "Over.50K", "High.Unemployment"))
+
+# Normal Data
+majors <- majors_factors
 ```
 
 ### Exploratory Data Analysis
@@ -63,31 +113,120 @@ As can be seen above, many of the categories are integer values. Many of these v
 Initial summary statistics and graphs with an emphasis on variables you believe to be important for your analysis. 
 
 ```{r}
-
+# 
 ```
 
 ### Data Vizualization
 
 ```{r}
+# Pre-analysis Data Visualization
+```
+
+### Model Building Linear Regression
+
+```{r}
+# Build Linear Regression Model for Median category
+```
+
+#### Prediction 
+
+```{r}
+# Predict Linear Regression Model
+```
+
+#### Evaluation 
+
+```{r}
+# Evaluate the linear regression model
+```
+
+### Model Building Classification Random Forest
+
+```{r}
+# Create combined target variable with (inverse of unemployment * median) categories
+```
+
+```{r}
+# Split data into Train, Tune, Test
+```
+
+```{r}
+# Build Random Forest Classification Model for Combined Category
+```
+
+#### Tuning
+
+Because the built in Random Forest Model was not agreeable with the tuning done with the caret library, an original random forest classification tuning metric was created in order to determine the best values for the three hyperparameters determined above.
+
+```{r}
+# Tune the model
+customRF <- list(type = "Classification", library = "randomForest", loop = NULL)
+customRF$parameters <- data.frame(parameter = c("mtry", "ntree", "sampsize"), class = rep("numeric", 3), label = c("mtry", "ntree", "sampsize"))
+customRF$grid <- function(x, y, len = NULL, search = "grid") {}
+customRF$fit <- function(x, y, wts, param, lev, last, weights, classProbs, ...) {
+    randomForest(x, y, mtry = param$mtry, ntree=param$ntree, ...)
+}
+customRF$predict <- function(modelFit, newdata, preProc = NULL, submodels = NULL)
+  predict(modelFit, newdata)
+customRF$prob <- function(modelFit, newdata, preProc = NULL, submodels = NULL)
+  predict(modelFit, newdata, type = "prob")
+customRF$sort <- function(x) x[order(x[,1]),]
+customRF$levels <- function(x) x$classes
+```
+
+Now, we can set the hyperparameter values to try and tune the model.
+
+```{r, echo=FALSE}
+# Build your model using the training data and default settings in caret, double check to make sure you are using a cross-validation training approach
+
+set.seed(1)
+
+# Choose the features and classes 
+# DROP the target variable
+features <- train[,-22]
+target <- train$income
+
+# Cross validation process
+# trainControl -> how do you want to train
+fitControl <- trainControl(method = "repeatedcv",
+                          number = 5, # number of folds : k = 10
+                          repeats = 5, # the number of complete sets of folds to compute (repeat 5 times -> total 50 models)
+                          search = "grid",
+                          returnResamp="all", # return a list of all samples
+                          classProbs = TRUE, # return the probabilities
+                          allowParallel = TRUE,
+                          summaryFunction = twoClassSummary) # return the models in parallel -> more efficient
+# number - number of folds
+# repeats - number of times the CV is repeated, here it's 5 take the average of those 5 repeats
+
+grid <- expand.grid(.mtry = c(3, 4, 5),
+                    .sampsize = c(50, 100, 200),
+                    .ntree = c(200, 300, 400) # try different number of boosting iterations
+                    #.model="rf")
+)
+# expand.grid - series of options that are available for model training based on different set hyper parameters
+grid
+# Specific Hyper Parameters of C50:
+# winnow - whether to reduce the feature space - works to remove unimportant features but it doesn't always work
+# trails - number of boosting iterations to try, 1 indicates a single model
+# model - type of ml model
+
+# train
+mdl <- train(income~., 
+             data = train,
+             method=customRF,
+             metric='ROC', 
+             tuneGrid=grid,
+             trControl=fitControl,
+             verbose=TRUE)
+mdl
 
 ```
 
-### Model Building
+#### Evaluation 
 
 ```{r}
-
-```
-
-### Prediction
-
-```{r}
-
-```
-
-### Evaluation
-
-```{r}
-
+# Evaluation of Model
 ```
 
 ### Fairness Assesment
