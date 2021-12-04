@@ -127,18 +127,116 @@ Initial summary statistics and graphs with an emphasis on variables you believe 
 
 ```{r}
 # Build Linear Regression Model for Median category
+
+median_dt <- majors_onehot[,-c("Median")]
+view(median_dt)
+
+part_index_1 <- caret::createDataPartition(median_dt$Over.50K,
+                                           times=1,
+                                           p = 0.70,
+                                           groups=1,
+                                           list=FALSE)
+View(part_index_1)
+dim(median_dt)
+
+train <- median_dt[part_index_1,]
+tune_and_test <- median_dt[-part_index_1, ]
+
+#The we need to use the function again to create the tuning set 
+
+tune_and_test_index <- createDataPartition(tune_and_test$Over.50K,
+                                           p = .5,
+                                           list = FALSE,
+                                           times = 1)
+
+tune <- tune_and_test[tune_and_test_index, ]
+test <- tune_and_test[-tune_and_test_index, ]
+
+
+dim(train)
+dim(tune)
+dim(test)
+
+#Cross validation process 
+
+fitControl <- trainControl(method = "repeatedcv",
+                          number = 10,
+                          repeats = 5, 
+                          returnResamp="all",
+                          savePredictions = 'final') 
+
+# number - number of folds
+# repeats - number of times the CV is repeated, here it's 5 take the average of
+# those 5 repeats
+#returnResamp - essential verbose, save all of the sampling data
+
+features <- train[,-"Over.50K"]
+target <- train$Over.50K
+
+View(target)
+
+str(features)
+
+set.seed(1984)
+median_mdl <- train(x=features,
+                    y=target,
+                    trControl=fitControl,
+                    method="C5.0",
+                    verbose=TRUE)
+
+median_mdl
 ```
 
 #### Prediction 
 
 ```{r}
 # Predict Linear Regression Model
+
+median_predict = predict(median_mdl,tune,type= "raw")
+
+confusionMatrix(as.factor(median_predict), 
+                as.factor(tune$Over.50K), 
+                dnn=c("Prediction", "Actual"), 
+                mode = "sens_spec")
 ```
 
 #### Evaluation 
 
 ```{r}
 # Evaluate the linear regression model
+
+varImp(median_mdl)
+
+grid <- expand.grid(.winnow = c(TRUE,FALSE), 
+                    .trials=c(20,30,40), 
+                    .model=c("tree","rules"))
+set.seed(1984)
+median_mdl_tune <- train(x=features,
+                y=target,
+                tuneGrid=grid,
+                trControl=fitControl,
+                method="C5.0",
+                verbose=TRUE)
+
+median_mdl_tune
+median_mdl
+
+# Want to evaluation again with the tune data using the new model 
+
+median_predict_tune = predict(median_mdl_tune,tune,type= "raw")
+
+confusionMatrix(as.factor(median_predict_tune), 
+                as.factor(tune$Over.50K), 
+                dnn=c("Prediction", "Actual"), 
+                mode = "sens_spec")
+
+#Test
+median_predict_test = predict(median_mdl_tune,test,type = "raw")
+
+confusionMatrix(as.factor(median_predict_test),
+                as.factor(test$Over.50K),
+                dnn=c("Prediction","Actual"),
+                mode = "sens_spec")
 ```
 
 ### Model Building Classification Random Forest
