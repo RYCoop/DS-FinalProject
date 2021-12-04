@@ -108,6 +108,13 @@ majors_onehot <- one_hot(data.table(majors_factors), cols = c("Major_category", 
 # Normal Data
 majors <- majors_factors
 ```
+```{r}
+# Data with combined target variable
+
+combined_target <- majors$Median * (1 - majors$Unemployment_rate) * majors$ShareWomen
+majors_combined_target <- data.frame(majors, combined_target)
+
+```
 
 ### Exploratory Data Analysis
 
