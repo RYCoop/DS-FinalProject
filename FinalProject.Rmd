@@ -15,8 +15,7 @@ output:
 ---
 
 ```{r setup, include=FALSE, cache=TRUE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
-
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 # cache --> only have to recompile the changes
 # eval --> runs the code
 # echo --> display the code
@@ -35,6 +34,7 @@ library(mltools)
 library(data.table)
 library(caret)
 library(pROC)
+library(RColorBrewer)
 ```
 
 ### Introduction
@@ -61,15 +61,12 @@ A brief look at the raw data can be found below.
 # Import the raw data
 majors_raw <- read.csv("/Users/rachael/Documents/School/Fall 2021/DS 3001/Final Project/recent-grads.csv")
 DT::datatable(majors_raw)
-```
-```{r}
-str(majors_raw)
-```
-```{r}
 # Remove rows with missing data
 majors_raw <- na.omit(majors_raw)
+```
 
-# Remove 
+```{r}
+str(majors_raw)
 ```
 
 As can be seen above, many of the categories are integer values. Many of these variables can be converted into factor variables in addition to the numerical ones. In addition, the variables Rank, Major Code, and Major can be dropped as the Rank variable highly correlates with the salary variable, and the other two are to specific and cannot be generalized.
@@ -86,7 +83,6 @@ table(majors_factors$Major_category)
 ```{r}
 # Changing Categorical Variables into Factor Variables
 majors_factors <- majors_added_categorical %>% mutate_if(sapply(majors_added_categorical, is.character), as.factor)
-
 # Collapsing Factors
 majors <- majors_factors$Major_category <- fct_collapse(majors_factors$Major_category,
                              Arts = c("Arts", "Humanities & Liberal Arts", "Industrial Arts & Consumer Services"),
@@ -98,39 +94,90 @@ majors <- majors_factors$Major_category <- fct_collapse(majors_factors$Major_cat
 ```{r}
 table(majors_factors$Major_category)
 ```
+
 In order to do some analysis, all categorical variables need to be one hot encoded, which is done below:
 
 ```{r}
 # One Hot Encoded Data
-# majors_onehot <- one_hot(data.table(majors_factors), cols = c("Major_category", "Over.50K", "High.Unemployment"))
 majors_onehot <- one_hot(data.table(majors_factors), cols = c("Major_category", "High.Unemployment"))
-
 # Normal Data
 majors <- majors_factors
 ```
 
 ### Exploratory Data Analysis
 
-Initial summary statistics and graphs with an emphasis on variables you believe to be important for your analysis. 
+Before beginning with the analytical part of the exploration, it is beneficial to visualize and summarize the data in order to get a better understanding of the data in its entirety, and with an emphasis on variables you believe to be important for your analysis. 
 
 ```{r}
-# 
+# Summary of Median variable
+summary(majors$Median)
+```
+
+```{r}
+# Correlation Matrix -> Which variables have the highest correlation with one another
+dat <- majors %>% select(-4, -19, -20)
+dat <- as_tibble(dat, na.rm = TRUE)
+
+# creating the correlation matrix
+res <- cor(dat, use = "complete.obs")
+round(res, 3)
 ```
 
 ### Data Vizualization
 
 ```{r}
+# Polar Chart to understand the sampling (how many in each category)
+# This will be important when connecting the results back to a real world application
+ggplot(majors, 
+       aes(x = Major_category)) + 
+  geom_bar(fill = brewer.pal(4, "Set3")) +
+  coord_polar()
+```
+
+```{r}
+# Stacked Bar Graph
+ggplot(majors, 
+       aes(x = Major_category, 
+           fill = Over.50K)) + 
+  geom_bar(position = "fill")
+```
+
+```{r}
+# Box Plots
+ggplot(majors, aes(x = Major_category, y = Median)) +
+  geom_boxplot(fill = brewer.pal(4, "Set3"),
+               color = "turquoise",
+               outlier.color = "pink") +
+   coord_flip()
+```
+
+```{r}
 # Pre-analysis Data Visualization
+
+# Use plotly to do a 3d imaging ~ is unique to plotly & means use all the layers
+fig <- plot_ly(majors, 
+               type = "scatter3d",
+               mode="markers",
+               symbol = "circle",
+               x = ~Unemployment_rate, 
+               y = ~ShareWomen,
+               z = ~Low_wage_jobs,
+               marker = list(color = ~Median, colorscale = "Viridis", showscale = TRUE), 
+               # hover text (shows up when we hover over a point)
+               text = ~paste('Salary Median:', Median,
+                             'unemployement Rate:', Unemployment_rate))
+
+fig
+# dev.off()
+
 ```
 
 ### Model Building Linear Regression
 
 ```{r}
 # Build Linear Regression Model for Median category
-
 median_dt <- majors_onehot[,-c("Median")]
 view(median_dt)
-
 part_index_1 <- caret::createDataPartition(median_dt$Over.50K,
                                            times=1,
                                            p = 0.70,
@@ -138,52 +185,38 @@ part_index_1 <- caret::createDataPartition(median_dt$Over.50K,
                                            list=FALSE)
 View(part_index_1)
 dim(median_dt)
-
 train <- median_dt[part_index_1,]
 tune_and_test <- median_dt[-part_index_1, ]
-
 #The we need to use the function again to create the tuning set 
-
 tune_and_test_index <- createDataPartition(tune_and_test$Over.50K,
                                            p = .5,
                                            list = FALSE,
                                            times = 1)
-
 tune <- tune_and_test[tune_and_test_index, ]
 test <- tune_and_test[-tune_and_test_index, ]
-
-
 dim(train)
 dim(tune)
 dim(test)
-
 #Cross validation process 
-
 fitControl <- trainControl(method = "repeatedcv",
                           number = 10,
                           repeats = 5, 
                           returnResamp="all",
                           savePredictions = 'final') 
-
 # number - number of folds
 # repeats - number of times the CV is repeated, here it's 5 take the average of
 # those 5 repeats
 #returnResamp - essential verbose, save all of the sampling data
-
 features <- train[,-"Over.50K"]
 target <- train$Over.50K
-
 View(target)
-
 str(features)
-
 set.seed(1984)
 median_mdl <- train(x=features,
                     y=target,
                     trControl=fitControl,
                     method="C5.0",
                     verbose=TRUE)
-
 median_mdl
 ```
 
@@ -191,22 +224,22 @@ median_mdl
 
 ```{r}
 # Predict Linear Regression Model
-
 median_predict = predict(median_mdl,tune,type= "raw")
-
 confusionMatrix(as.factor(median_predict), 
                 as.factor(tune$Over.50K), 
                 dnn=c("Prediction", "Actual"), 
                 mode = "sens_spec")
 ```
 
+```{r}
+# Given a certain values for the other variables predict the Median Salary
+```
+
 #### Evaluation 
 
 ```{r}
 # Evaluate the linear regression model
-
 varImp(median_mdl)
-
 grid <- expand.grid(.winnow = c(TRUE,FALSE), 
                     .trials=c(20,30,40), 
                     .model=c("tree","rules"))
@@ -217,22 +250,16 @@ median_mdl_tune <- train(x=features,
                 trControl=fitControl,
                 method="C5.0",
                 verbose=TRUE)
-
 median_mdl_tune
 median_mdl
-
 # Want to evaluation again with the tune data using the new model 
-
 median_predict_tune = predict(median_mdl_tune,tune,type= "raw")
-
 confusionMatrix(as.factor(median_predict_tune), 
                 as.factor(tune$Over.50K), 
                 dnn=c("Prediction", "Actual"), 
                 mode = "sens_spec")
-
 #Test
 median_predict_test = predict(median_mdl_tune,test,type = "raw")
-
 confusionMatrix(as.factor(median_predict_test),
                 as.factor(test$Over.50K),
                 dnn=c("Prediction","Actual"),
@@ -245,28 +272,6 @@ confusionMatrix(as.factor(median_predict_test),
 # Create combined target variable with (inverse of unemployment * median) categories
 combined_target <- majors$Median * (1 - majors$Unemployment_rate) * majors$ShareWomen
 majors_combined_target <- data.frame(majors, combined_target)
-
-view(majors_combined_target)
-```
-
-```{r}
-# Next let's one-hot encode those factor variables/character 
-majors_combined_target$combined_target <-ifelse(majors_combined_target$combined_target > 20000,1,0)
-
-#added this a predictor versus replacing the numeric version
-(majors_combined_target$combined_target <- cut(majors_combined_target$combined_target,c(-1,0.3953488,1),labels = c(0,1)))
-majors_combined_target$combined_target <- fct_collapse(majors_combined_target$combined_target, "LE.EQ.20K"="0", "G.50K"="1")
-majors_combined_target <- majors_combined_target %>%
-  mutate(combined_target = factor(combined_target, labels = make.names(levels(combined_target))))
-
-str(majors_combined_target)
-```
-
-```{r}
-#Determine the baserate or prevalence for the classifier
-
-(prevalence <- table(majors_combined_target$combined_target)[[2]]/length(majors_combined_target$combined_target))
-table(majors_combined_target$combined_target)
 ```
 
 ```{r}
@@ -287,17 +292,15 @@ tune <- tune_and_test[tune_and_test_index, ]
 test <- tune_and_test[-tune_and_test_index, ]
 dim(train)
 dim(test)
-dim(tune)
 # these are slightly off because the data set isn't perfectly even
+dim(tune)
 ```
-
 ```{r}
 #Calculate the initial mtry level 
 mytry_tune <- function(x){
   y <- dim(x)[2]-1
   sqrt(y)
 }
-
 mytry_tune(majors_combined_target)
 ```
 
@@ -326,44 +329,31 @@ combined_RF = randomForest(combined_target~.,          #<- Formula: response var
                             do.trace = TRUE,     #<- If set to TRUE, give a more verbose output as randomForest is run.
                             keep.forest = TRUE,  #<- If set to FALSE, the forest will not be retained in the output object. If xtest is given, defaults to FALSE.
                             keep.inbag = TRUE)   #<- Should an n by ntree matrix be returned that keeps track of which samples are in-bag in which trees? 
-
 # Look at the output of the random forest.
 combined_RF
 ```
 
 ```{r}
 # Determining the number of trees that should be used 
-
 # The "err.rate" argument includes a list of the cumulative error rates
 # for each tree, by class and in aggregate for data points not 
 # included in the tree (OOB).
 View(as.data.frame(combined_RF$err.rate))
-
 err.rate <- as.data.frame(combined_RF$err.rate)
-
 View(err.rate)
-
 # The "oob.times" argument includes the number of times that each data point
 # is not excluded from trees in the random forest.
-
 View(as.data.frame(combined_RF$oob.times))
-
 combined_RF_error = data.frame(1:nrow(combined_RF$err.rate),
                                 combined_RF$err.rate)
 combined_RF_error
-
-colnames(combined_RF_error) = c("Number of Trees", "Out of the Box","<=20K", ">20K")
-
-combined_RF_error$Diff <- combined_RF_error$'>20K'-combined_RF_error$`<=20K`
-
+colnames(combined_RF_error) = c("Number of Trees", "Out of the Box","<=50K", ">50K")
+combined_RF_error$Diff <- combined_RF_error$'>50K'-combined_RF_error$`<=50K`
 View(combined_RF_error)
-
-# 54 Trees should be used because that amount is correlated to the minimum OOB error and >20K value. 
 ```
 
 ```{r}
-#Determining the right number of variables to randomly sample (the mtry parameter)
-
+# Determining the right number of variables to randomly sample (the mtry parameter)
 str(train)
 set.seed(2)
 combined_RF_mtry = tuneRF(data.frame(train[ ,1:20]),  #<- data frame of predictor variables
@@ -375,12 +365,9 @@ combined_RF_mtry = tuneRF(data.frame(train[ ,1:20]),  #<- data frame of predicto
                            trace = TRUE,                         #<- whether to print the progress of the search
                            plot = TRUE,                          #<- whether to plot the OOB error as a function of mtry
                            doBest = TRUE)                       #<- whether to create a random forest using the optimal mtry parameter
-
 combined_RF_mtry
-
 #Based on the output of the combined_RF_mtry, it looks like 20 variables is the right number of variables to sample becauses it has the least OOB error compared to 2,4,8, and 16. 
 ```
-
 
 ```{r}
 # Build Random Forest Classification Model for Combined Category in consideration of the number of trees, the number of variables to sample and the sample size that optimize the model output. 
@@ -392,7 +379,7 @@ combined_RF_2 = randomForest(combined_target~.,          #<- Formula: response v
                             #subset = NULL,      #<- This is unnecessary because we're using all the rows in the training data set.
                             #xtest = NULL,       #<- This is already defined in the formula by the ".".
                             #ytest = NULL,       #<- This is already defined in the formula by "PREGNANT".
-                            ntree = 54,        #<- Number of trees to grow. This should not be set to too small a number, to ensure that every input row gets classified at least a few times.
+                            ntree = 500,        #<- Number of trees to grow. This should not be set to too small a number, to ensure that every input row gets classified at least a few times.
                             mtry = 20,            #<- Number of variables randomly sampled as candidates at each split. Default number for classification is sqrt(# of variables). Default number for regression is (# of variables / 3).
                             replace = TRUE,      #<- Should sampled data points be replaced.
                             #classwt = NULL,     #<- Priors of the classes. Use this if you want to specify what proportion of the data SHOULD be in each class. This is relevant if your sample data is not completely representative of the actual population 
@@ -407,11 +394,8 @@ combined_RF_2 = randomForest(combined_target~.,          #<- Formula: response v
                             do.trace = TRUE,     #<- If set to TRUE, give a more verbose output as randomForest is run.
                             keep.forest = TRUE,  #<- If set to FALSE, the forest will not be retained in the output object. If xtest is given, defaults to FALSE.
                             keep.inbag = TRUE)   #<- Should an n by ntree matrix be returned that keeps track of which samples are in-bag in which trees? 
-
 # Look at the output of the random forest.
 combined_RF_2
-
-#The sample size of the model was kept at the original value of 100, because it was found that this value minimized the class error as much as possible for both classes. When the sample size was increased or decreased, one of the class errors tends to fall, but the other rises significantly. Therefore, this is the best sample size that will minimize class errors, and prevent over or under fitting of the data.
 ```
 
 #### Tuning
@@ -438,14 +422,11 @@ Now, we can set the hyperparameter values to try and tune the model.
 
 ```{r, echo=FALSE}
 # Build your model using the training data and default settings in caret, double check to make sure you are using a cross-validation training approach
-
 set.seed(1)
-
 # Choose the features and classes 
 # DROP the target variable
-features <- train[,-22]
-target <- train$income
-
+features <- train[,-19]
+target <- train$Over.50K
 # Cross validation process
 # trainControl -> how do you want to train
 fitControl <- trainControl(method = "repeatedcv",
@@ -458,7 +439,6 @@ fitControl <- trainControl(method = "repeatedcv",
                           summaryFunction = twoClassSummary) # return the models in parallel -> more efficient
 # number - number of folds
 # repeats - number of times the CV is repeated, here it's 5 take the average of those 5 repeats
-
 grid <- expand.grid(.mtry = c(3, 4, 5),
                     .sampsize = c(50, 100, 200),
                     .ntree = c(200, 300, 400) # try different number of boosting iterations
@@ -470,19 +450,19 @@ grid
 # winnow - whether to reduce the feature space - works to remove unimportant features but it doesn't always work
 # trails - number of boosting iterations to try, 1 indicates a single model
 # model - type of ml model
-
 # train
-mdl <- train(income~., 
-             data = train,
+
+# Need to drop high unemployement because it is a constant in the training set
+train2 <- train %>% select(-High.Unemployment)
+mdl <- train(Over.50K~., 
+             data = train2,
              method=customRF,
              metric='ROC', 
              tuneGrid=grid,
              trControl=fitControl,
              verbose=TRUE)
 mdl
-
 ```
-
 #### Evaluation 
 
 ```{r}
@@ -498,6 +478,3 @@ What can you say about the results of the methods section as it relates to your 
 ### Future Recommendations
 
 What additional analysis is needed or what limited your analysis on this project?
-
-
-
