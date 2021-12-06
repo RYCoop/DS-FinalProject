@@ -243,14 +243,34 @@ confusionMatrix(as.factor(median_predict_test),
 
 ```{r}
 # Create combined target variable with (inverse of unemployment * median) categories
-
 combined_target <- majors$Median * (1 - majors$Unemployment_rate) * majors$ShareWomen
 majors_combined_target <- data.frame(majors, combined_target)
+
+view(majors_combined_target)
+```
+
+```{r}
+# Next let's one-hot encode those factor variables/character 
+majors_combined_target$combined_target <-ifelse(majors_combined_target$combined_target > 20000,1,0)
+
+#added this a predictor versus replacing the numeric version
+(majors_combined_target$combined_target <- cut(majors_combined_target$combined_target,c(-1,0.3953488,1),labels = c(0,1)))
+majors_combined_target$combined_target <- fct_collapse(majors_combined_target$combined_target, "LE.EQ.20K"="0", "G.50K"="1")
+majors_combined_target <- majors_combined_target %>%
+  mutate(combined_target = factor(combined_target, labels = make.names(levels(combined_target))))
+
+str(majors_combined_target)
+```
+
+```{r}
+#Determine the baserate or prevalence for the classifier
+
+(prevalence <- table(majors_combined_target$combined_target)[[2]]/length(majors_combined_target$combined_target))
+table(majors_combined_target$combined_target)
 ```
 
 ```{r}
 # Split data into Train, Tune, Test
-
 part_index_1 <- caret::createDataPartition(majors_combined_target$combined_target,
                                            times=1,
                                            p = 0.70,
@@ -267,10 +287,10 @@ tune <- tune_and_test[tune_and_test_index, ]
 test <- tune_and_test[-tune_and_test_index, ]
 dim(train)
 dim(test)
-# these are slightly off because the data set isn't perfectly even
-
 dim(tune)
+# these are slightly off because the data set isn't perfectly even
 ```
+
 ```{r}
 #Calculate the initial mtry level 
 mytry_tune <- function(x){
@@ -332,11 +352,13 @@ combined_RF_error = data.frame(1:nrow(combined_RF$err.rate),
                                 combined_RF$err.rate)
 combined_RF_error
 
-colnames(combined_RF_error) = c("Number of Trees", "Out of the Box","<=50K", ">50K")
+colnames(combined_RF_error) = c("Number of Trees", "Out of the Box","<=20K", ">20K")
 
-combined_RF_error$Diff <- combined_RF_error$'>50K'-combined_RF_error$`<=50K`
+combined_RF_error$Diff <- combined_RF_error$'>20K'-combined_RF_error$`<=20K`
 
 View(combined_RF_error)
+
+# 54 Trees should be used because that amount is correlated to the minimum OOB error and >20K value. 
 ```
 
 ```{r}
@@ -359,6 +381,7 @@ combined_RF_mtry
 #Based on the output of the combined_RF_mtry, it looks like 20 variables is the right number of variables to sample becauses it has the least OOB error compared to 2,4,8, and 16. 
 ```
 
+
 ```{r}
 # Build Random Forest Classification Model for Combined Category in consideration of the number of trees, the number of variables to sample and the sample size that optimize the model output. 
 set.seed(2023)
@@ -369,7 +392,7 @@ combined_RF_2 = randomForest(combined_target~.,          #<- Formula: response v
                             #subset = NULL,      #<- This is unnecessary because we're using all the rows in the training data set.
                             #xtest = NULL,       #<- This is already defined in the formula by the ".".
                             #ytest = NULL,       #<- This is already defined in the formula by "PREGNANT".
-                            ntree = 500,        #<- Number of trees to grow. This should not be set to too small a number, to ensure that every input row gets classified at least a few times.
+                            ntree = 54,        #<- Number of trees to grow. This should not be set to too small a number, to ensure that every input row gets classified at least a few times.
                             mtry = 20,            #<- Number of variables randomly sampled as candidates at each split. Default number for classification is sqrt(# of variables). Default number for regression is (# of variables / 3).
                             replace = TRUE,      #<- Should sampled data points be replaced.
                             #classwt = NULL,     #<- Priors of the classes. Use this if you want to specify what proportion of the data SHOULD be in each class. This is relevant if your sample data is not completely representative of the actual population 
@@ -387,6 +410,8 @@ combined_RF_2 = randomForest(combined_target~.,          #<- Formula: response v
 
 # Look at the output of the random forest.
 combined_RF_2
+
+#The sample size of the model was kept at the original value of 100, because it was found that this value minimized the class error as much as possible for both classes. When the sample size was increased or decreased, one of the class errors tends to fall, but the other rises significantly. Therefore, this is the best sample size that will minimize class errors, and prevent over or under fitting of the data.
 ```
 
 #### Tuning
