@@ -108,13 +108,6 @@ majors_onehot <- one_hot(data.table(majors_factors), cols = c("Major_category", 
 # Normal Data
 majors <- majors_factors
 ```
-```{r}
-# Data with combined target variable
-
-combined_target <- majors$Median * (1 - majors$Unemployment_rate) * majors$ShareWomen
-majors_combined_target <- data.frame(majors, combined_target)
-
-```
 
 ### Exploratory Data Analysis
 
@@ -250,14 +243,150 @@ confusionMatrix(as.factor(median_predict_test),
 
 ```{r}
 # Create combined target variable with (inverse of unemployment * median) categories
+
+combined_target <- majors$Median * (1 - majors$Unemployment_rate) * majors$ShareWomen
+majors_combined_target <- data.frame(majors, combined_target)
 ```
 
 ```{r}
 # Split data into Train, Tune, Test
+
+part_index_1 <- caret::createDataPartition(majors_combined_target$combined_target,
+                                           times=1,
+                                           p = 0.70,
+                                           groups=1,
+                                           list=FALSE)
+train <- majors_combined_target[part_index_1, ]
+tune_and_test <- majors_combined_target[-part_index_1, ]
+#The we need to use the function again to create the tuning set 
+tune_and_test_index <- createDataPartition(tune_and_test$combined_target,
+                                           p = .5,
+                                           list = FALSE,
+                                           times = 1)
+tune <- tune_and_test[tune_and_test_index, ]
+test <- tune_and_test[-tune_and_test_index, ]
+dim(train)
+dim(test)
+# these are slightly off because the data set isn't perfectly even
+
+dim(tune)
+```
+```{r}
+#Calculate the initial mtry level 
+mytry_tune <- function(x){
+  y <- dim(x)[2]-1
+  sqrt(y)
+}
+
+mytry_tune(majors_combined_target)
 ```
 
 ```{r}
-# Build Random Forest Classification Model for Combined Category
+#Creating an initial random forest model with 500 trees
+set.seed(2023)
+combined_RF = randomForest(combined_target~.,          #<- Formula: response variable ~ predictors.
+                            #   The period means 'use all other variables in the data'.
+                            train,     #<- A data frame with the variables to be used.
+                            #y = NULL,           #<- A response vector. This is unnecessary because we're specifying a response formula.
+                            #subset = NULL,      #<- This is unnecessary because we're using all the rows in the training data set.
+                            #xtest = NULL,       #<- This is already defined in the formula by the ".".
+                            #ytest = NULL,       #<- This is already defined in the formula by "PREGNANT".
+                            ntree = 500,        #<- Number of trees to grow. This should not be set to too small a number, to ensure that every input row gets classified at least a few times.
+                            mtry = 4,            #<- Number of variables randomly sampled as candidates at each split. Default number for classification is sqrt(# of variables). Default number for regression is (# of variables / 3).
+                            replace = TRUE,      #<- Should sampled data points be replaced.
+                            #classwt = NULL,     #<- Priors of the classes. Use this if you want to specify what proportion of the data SHOULD be in each class. This is relevant if your sample data is not completely representative of the actual population 
+                            #strata = NULL,      #<- Not necessary for our purpose here.
+                            sampsize = 100,      #<- Size of sample to draw each time.
+                            nodesize = 5,        #<- Minimum numbers of data points in terminal nodes.
+                            #maxnodes = NULL,    #<- Limits the number of maximum splits. 
+                            importance = TRUE,   #<- Should importance of predictors be assessed?
+                            #localImp = FALSE,   #<- Should casewise importance measure be computed? (Setting this to TRUE will override importance.)
+                            proximity = FALSE,    #<- Should a proximity measure between rows be calculated?
+                            norm.votes = TRUE,   #<- If TRUE (default), the final result of votes are expressed as fractions. If FALSE, raw vote counts are returned (useful for combining results from different runs).
+                            do.trace = TRUE,     #<- If set to TRUE, give a more verbose output as randomForest is run.
+                            keep.forest = TRUE,  #<- If set to FALSE, the forest will not be retained in the output object. If xtest is given, defaults to FALSE.
+                            keep.inbag = TRUE)   #<- Should an n by ntree matrix be returned that keeps track of which samples are in-bag in which trees? 
+
+# Look at the output of the random forest.
+combined_RF
+```
+
+```{r}
+# Determining the number of trees that should be used 
+
+# The "err.rate" argument includes a list of the cumulative error rates
+# for each tree, by class and in aggregate for data points not 
+# included in the tree (OOB).
+View(as.data.frame(combined_RF$err.rate))
+
+err.rate <- as.data.frame(combined_RF$err.rate)
+
+View(err.rate)
+
+# The "oob.times" argument includes the number of times that each data point
+# is not excluded from trees in the random forest.
+
+View(as.data.frame(combined_RF$oob.times))
+
+combined_RF_error = data.frame(1:nrow(combined_RF$err.rate),
+                                combined_RF$err.rate)
+combined_RF_error
+
+colnames(combined_RF_error) = c("Number of Trees", "Out of the Box","<=50K", ">50K")
+
+combined_RF_error$Diff <- combined_RF_error$'>50K'-combined_RF_error$`<=50K`
+
+View(combined_RF_error)
+```
+
+```{r}
+#Determining the right number of variables to randomly sample (the mtry parameter)
+
+str(train)
+set.seed(2)
+combined_RF_mtry = tuneRF(data.frame(train[ ,1:20]),  #<- data frame of predictor variables
+                           (train[ ,21]),              #<- response vector (variables), factors for classification and continuous variable for regression
+                           mtryStart = 4,                        #<- starting value of mtry, the default is the same as in the randomForest function
+                           ntreeTry = 79,                        #<- number of trees used at the tuning step, let's use the same number as we did for the random forest
+                           stepFactor = 2,                       #<- at each iteration, mtry is inflated (or deflated) by this value
+                           improve = 0.05,                       #<- the improvement in OOB error must be by this much for the search to continue
+                           trace = TRUE,                         #<- whether to print the progress of the search
+                           plot = TRUE,                          #<- whether to plot the OOB error as a function of mtry
+                           doBest = TRUE)                       #<- whether to create a random forest using the optimal mtry parameter
+
+combined_RF_mtry
+
+#Based on the output of the combined_RF_mtry, it looks like 20 variables is the right number of variables to sample becauses it has the least OOB error compared to 2,4,8, and 16. 
+```
+
+```{r}
+# Build Random Forest Classification Model for Combined Category in consideration of the number of trees, the number of variables to sample and the sample size that optimize the model output. 
+set.seed(2023)
+combined_RF_2 = randomForest(combined_target~.,          #<- Formula: response variable ~ predictors.
+                            #   The period means 'use all other variables in the data'.
+                            train,     #<- A data frame with the variables to be used.
+                            #y = NULL,           #<- A response vector. This is unnecessary because we're specifying a response formula.
+                            #subset = NULL,      #<- This is unnecessary because we're using all the rows in the training data set.
+                            #xtest = NULL,       #<- This is already defined in the formula by the ".".
+                            #ytest = NULL,       #<- This is already defined in the formula by "PREGNANT".
+                            ntree = 500,        #<- Number of trees to grow. This should not be set to too small a number, to ensure that every input row gets classified at least a few times.
+                            mtry = 20,            #<- Number of variables randomly sampled as candidates at each split. Default number for classification is sqrt(# of variables). Default number for regression is (# of variables / 3).
+                            replace = TRUE,      #<- Should sampled data points be replaced.
+                            #classwt = NULL,     #<- Priors of the classes. Use this if you want to specify what proportion of the data SHOULD be in each class. This is relevant if your sample data is not completely representative of the actual population 
+                            #strata = NULL,      #<- Not necessary for our purpose here.
+                            sampsize = 100,      #<- Size of sample to draw each time.
+                            nodesize = 5,        #<- Minimum numbers of data points in terminal nodes.
+                            #maxnodes = NULL,    #<- Limits the number of maximum splits. 
+                            importance = TRUE,   #<- Should importance of predictors be assessed?
+                            #localImp = FALSE,   #<- Should casewise importance measure be computed? (Setting this to TRUE will override importance.)
+                            proximity = FALSE,    #<- Should a proximity measure between rows be calculated?
+                            norm.votes = TRUE,   #<- If TRUE (default), the final result of votes are expressed as fractions. If FALSE, raw vote counts are returned (useful for combining results from different runs).
+                            do.trace = TRUE,     #<- If set to TRUE, give a more verbose output as randomForest is run.
+                            keep.forest = TRUE,  #<- If set to FALSE, the forest will not be retained in the output object. If xtest is given, defaults to FALSE.
+                            keep.inbag = TRUE)   #<- Should an n by ntree matrix be returned that keeps track of which samples are in-bag in which trees? 
+
+# Look at the output of the random forest.
+combined_RF_2
 ```
 
 #### Tuning
