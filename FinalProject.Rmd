@@ -55,7 +55,19 @@ This data is pulled from the 2012-12 American Community Survey Public Use Microd
 
 ### Process Overview
 
-What will we be doing? Methods, techniques, why?
+1) Load & Clean Data
+    a) Classify Variables Correctly
+    b) One-Hot Encoding
+2) Exploratory Data Analysis
+3) Data Visualization 
+4) Build a Linear Regression Model
+    a) Prediction
+    b) Evaluation
+5) Build a Random Forest Model
+    a) Calculate mtry Level
+    b) Optimize/Tune the Model
+    c) Evaluation
+6) Fairness Assessment
 
 ### Data Cleaning
 
