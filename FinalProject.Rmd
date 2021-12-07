@@ -140,9 +140,11 @@ round(res, 3)
 head(res, 3)
 ```
 
-The above confusion matrix details the correlation coefficients between all the respective variables with "Total," "Men," and "Women." The correlation coefficient is a measure of the relationship strength between two different variables, with the magnitude closest to 1 or -1 indicating there is a strong direct and/or indirect relationship. Based on the output, it is important to note the differences among the "Employed" between men and women. Comparatively, there is a stronger direct relationship between women being employed (*~0.945*) when compared to men (*~0.878*). Similarly, women are more prone to work part-time (*~0.917*) when compared to men (*~0.894*). On the other hand, when comparing the median variable, which describes the median earnings of full-time year-round workers, women tend to have a slight inverse relationship (*~-0.182*) whereas men have a slight direct relationship (*~0.025*). This is an important dissimilarity, considering women are slightly more employed yet do not payed as much in comparison
+The above confusion matrix details the correlation coefficients between all the respective variables with "Total," "Men," and "Women." The correlation coefficient is a measure of the relationship strength between two different variables, with the magnitude closest to 1 or -1 indicating there is a strong direct and/or indirect relationship. Based on the output, it is important to note the differences among the "Employed" between men and women. Comparatively, there is a stronger direct relationship between women being employed (~0.945) when compared to men (~0.878). Similarly, women are more prone to work part-time (~0.917) when compared to men (~0.894). On the other hand, when comparing the median variable, which describes the median earnings of full-time year-round workers, women tend to have a slight inverse relationship (~ -0.182) whereas men have a slight direct relationship (~0.025). This is an important dissimilarity, considering women are slightly more employed yet do not payed as much in comparison
 
 ### Data Vizualization
+
+Now, we can visualize the dataset. To do this, we used the ggplot and plot_ly packages. 
 
 ```{r, echo=FALSE}
 # Polar Chart to understand the sampling (how many in each category)
@@ -153,6 +155,8 @@ ggplot(majors,
   coord_polar()
 ```
 
+As can be seen above, the first graph we created is a polar graph. A polar graph allows the reader to understand the sampling distribution, as well as the amount of representation each major category has in the dataset. The larger the slice, the more representation the category has in the dataset. From the polar chart, Sciences has the largest amount of representation, followed closely by the Other category. STEM is third, but by a large margin, and Arts is last.
+
 ```{r, echo=FALSE}
 # Stacked Bar Graph
 ggplot(majors, 
@@ -160,6 +164,9 @@ ggplot(majors,
            fill = Over.50K)) + 
   geom_bar(position = "fill")
 ```
+
+The next graph we created was a stacked bar graph. The major category is on the x-axis, while the count - normalized to be between 0 and 1 - is on the y-axis. The fill of the graph is based on whether or not a person from that category has a median salary that is larger than $50,000. From this graph, it seems that STEM majors have almost 50 percent of their category making above 50K per year - the largest percentage of the four major categories. The other three major categories are nowhere close to STEM, with the Other category coming in second with about 7 percent of their category making above 50K. Science is third with what seems to be about 1 percent of their category making above 50K, and Art is last with what seems to be 0 percent of their category making above 50K per year.
+
 
 ```{r, echo=FALSE}
 # Box Plots
@@ -169,6 +176,8 @@ ggplot(majors, aes(x = Major_category, y = Median)) +
                outlier.color = "pink") +
    coord_flip()
 ```
+
+For our third graph, we decided to make a box-plot graph where the x-axis is the median salary and the y-axis is the four major categories. From this graph, it can be deduced that the range of STEM majors is higher than that of any other major. The range of STEM majors seems to be about 40-50K, whereas the other majors have a maximum range of 30K. There is a STEM major who currently has a median salary of 120K, which is almost double the highest median salary of any other major category. Another interesting aspect about the STEM box-plot, when compared to the other three, is that the median salary for the 25th percentile of STEM is equal to about 45K, which is higher than the median salary of the 75th percentile for any other category. The other three boxplots are relatively similar to each other, with the Art category being much skinnier than the other two. The skinnier the graph, the smaller the range of the graph.
 
 ```{r, echo=FALSE}
 # Pre-analysis Data Visualization
@@ -190,6 +199,8 @@ fig
 # dev.off()
 
 ```
+
+Our final graph above is a three-dimensional scatterplot. The unemployment rate on a scale of 0-1 is on the x-axis, the share of women as a decimal is on the y-axis, and the z-axis has the salary of the low-wage jobs that people work. The color of the marker is dependent on how much money each person makes, and uses a gradient color scheme. From the graph, it can be determined that women do not make as much money as men as they are working in lower-wage jobs and have higher rates of unemployment. Another interesting thing to note is that only one student overall made above a 100K median salary.
 
 ### Model Building Linear Regression
 
@@ -236,8 +247,21 @@ median_mdl <- train(x=features,
                     trControl=fitControl,
                     method="C5.0",
                     verbose=TRUE)
+```
+
+
+```{r}
 median_mdl
 ```
+
+Based on the accuracies and the respective kappa values for each set of trials, both with and without winnowing, the final model was chosen with 1 trial and without winnowing. This indicates that the lowest possible number of boosting iterations is favorable. The accuracy for winnowing with 20 trials was approximately 0.8834 and comparatively the accuracy for no winnowing with 1 trials was approximately 0.9295. Based on those values, the difference between the number of trials along with factoring in no winnowing or winnowing was a good amount; therefore, it is important to highlight that no winnowing and a small trial number would be the most suitable option for constructing this model.
+
+```{r}
+# plot the model
+plot(median_mdl)
+```
+
+Graphically, the difference between no winnowing (FALSE) and winnowing (TRUE) and the respective trials can be visualized. As seen in the graph, the graph trends downwards as the number of trials increased. The FALSE graph is also much higher relating to accuracy, when compared to TRUE. This visualization can be supported by the previous output that identified 1 trial and no winnowing, as the most favorable final model.
 
 #### Prediction 
 
@@ -247,12 +271,10 @@ median_predict = predict(median_mdl,tune,type= "raw")
 confusionMatrix(as.factor(median_predict), 
                 as.factor(tune$Over.50K), 
                 dnn=c("Prediction", "Actual"), 
-                mode = "sens_spec")
+                mode = "everything")
 ```
 
-```{r}
-# Given a certain values for the other variables predict the Median Salary
-```
+From the generated confusion matrix, the most useful metrics for analysis would be the accuracy coupled with the F1 score. The goal is to have accuracy be as close to 1 as possible; therefore, with that understanding, the value of *0.9615* is very optimal. It could continue to be optimized to have the value be closer to 1, but that value would be considered "great" in terms of the model as a whole. The F1 score is a measure of the model's accuracy. The value of *0.8571* from the statistics indicates that the model is pretty accurate but similar to the accuracy, it should also be improved in order to be as close to 1 as possible.
 
 #### Evaluation 
 
