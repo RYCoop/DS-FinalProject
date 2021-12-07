@@ -69,7 +69,7 @@ DT::datatable(majors_raw)
 majors_raw <- na.omit(majors_raw)
 ```
 
-```{r}
+```{r, echo=FALSE}
 str(majors_raw)
 ```
 
@@ -81,7 +81,7 @@ majors_added_categorical <- majors_raw %>% mutate(Over.50K = ifelse(Median > 500
 
 In addition, the categorical variable categories can be compressed in order for more useful data for the analysis.
 
-```{r}
+```{r, include=FALSE}
 # Changing Categorical Variables into Factor Variables
 majors_factors <- majors_added_categorical %>% mutate_if(sapply(majors_added_categorical, is.character), as.factor)
 # Collapsing Factors
@@ -92,7 +92,7 @@ majors <- majors_factors$Major_category <- fct_collapse(majors_factors$Major_cat
                              Other = c("Interdisciplinary", "Education", "Psychology & Social Work", "Communications & Journalism", "Business", "Law & Public Policy"))
 ```
 
-```{r}
+```{r, echo=FALSE}
 table(majors_factors$Major_category)
 ```
 
@@ -109,12 +109,12 @@ majors <- majors_factors
 
 Before beginning with the analytical part of the exploration, it is beneficial to visualize and summarize the data in order to get a better understanding of the data in its entirety, and with an emphasis on variables you believe to be important for your analysis. 
 
-```{r}
+```{r, echo=FALSE}
 # Summary of Median variable
 summary(majors$Median)
 ```
 
-```{r}
+```{r, include=FALSE}
 # Correlation Matrix -> Which variables have the highest correlation with one another
 dat <- majors %>% select(-4, -19, -20)
 dat <- as_tibble(dat, na.rm = TRUE)
@@ -124,9 +124,14 @@ res <- cor(dat, use = "complete.obs")
 round(res, 3)
 ```
 
+```{r, echo=FALSE}
+head(res, 5)
+```
+
+
 ### Data Vizualization
 
-```{r}
+```{r, echo=FALSE}
 # Polar Chart to understand the sampling (how many in each category)
 # This will be important when connecting the results back to a real world application
 ggplot(majors, 
@@ -135,7 +140,7 @@ ggplot(majors,
   coord_polar()
 ```
 
-```{r}
+```{r, echo=FALSE}
 # Stacked Bar Graph
 ggplot(majors, 
        aes(x = Major_category, 
@@ -143,7 +148,7 @@ ggplot(majors,
   geom_bar(position = "fill")
 ```
 
-```{r}
+```{r, echo=FALSE}
 # Box Plots
 ggplot(majors, aes(x = Major_category, y = Median)) +
   geom_boxplot(fill = brewer.pal(4, "Set3"),
@@ -152,7 +157,7 @@ ggplot(majors, aes(x = Major_category, y = Median)) +
    coord_flip()
 ```
 
-```{r}
+```{r, echo=FALSE}
 # Pre-analysis Data Visualization
 
 # Use plotly to do a 3d imaging ~ is unique to plotly & means use all the layers
@@ -175,7 +180,7 @@ fig
 
 ### Model Building Linear Regression
 
-```{r}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 # Build Linear Regression Model for Median category
 median_dt <- majors_onehot[,-c("Median")]
 # view(median_dt)
@@ -223,7 +228,7 @@ median_mdl
 
 #### Prediction 
 
-```{r}
+```{r, echo=FALSE}
 # Predict Linear Regression Model
 median_predict = predict(median_mdl,tune,type= "raw")
 confusionMatrix(as.factor(median_predict), 
@@ -238,7 +243,7 @@ confusionMatrix(as.factor(median_predict),
 
 #### Evaluation 
 
-```{r}
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
 # Evaluate the linear regression model
 varImp(median_mdl)
 grid <- expand.grid(.winnow = c(TRUE,FALSE), 
