@@ -41,13 +41,17 @@ library(RColorBrewer)
 
 Many colleges want to optimize the money they receive from their alumni. In order to do so, they need to identify and predict the salary/unemployment rate of recent graduates based on their education and other various factors. Doing so, they will be able to put more money into those programs to get a larger return on their investments (students).
 
-Business Question: Where can colleges put money in order to optimize the amount of money they receive from recent graduates?
+*Business Question:*
 
-Analysis Question: Based on recent graduates and their characteristics/education, what would be their predicted median salary? Would they make over or less than six figures?
+Where can colleges put money in order to optimize the amount of money they receive from recent graduates?
+
+*Analysis Question:*
+
+Based on recent graduates and their characteristics/education, what would be their predicted median salary? Would they make over or less than six figures?
 
 ### Background Information
 
-What about the data do we need to know...
+This data is pulled from the 2012-12 American Community Survey Public Use Microdata Series, and is limited to those users under the age of 28. The general purpose of this code and data is based upon the story [linked phrase] (https://fivethirtyeight.com/features/the-economic-guide-to-picking-a-college-major/)
 
 ### Process Overview
 
@@ -59,7 +63,7 @@ A brief look at the raw data can be found below.
 
 ```{r, echo = FALSE}
 # Import the raw data
-majors_raw <- read.csv("/Users/rachael/Documents/School/Fall 2021/DS 3001/Final Project/recent-grads.csv")
+majors_raw <- read.csv("./recent-grads.csv")
 DT::datatable(majors_raw)
 # Remove rows with missing data
 majors_raw <- na.omit(majors_raw)
@@ -77,9 +81,6 @@ majors_added_categorical <- majors_raw %>% mutate(Over.50K = ifelse(Median > 500
 
 In addition, the categorical variable categories can be compressed in order for more useful data for the analysis.
 
-```{r}
-table(majors_factors$Major_category)
-```
 ```{r}
 # Changing Categorical Variables into Factor Variables
 majors_factors <- majors_added_categorical %>% mutate_if(sapply(majors_added_categorical, is.character), as.factor)
@@ -177,13 +178,13 @@ fig
 ```{r}
 # Build Linear Regression Model for Median category
 median_dt <- majors_onehot[,-c("Median")]
-view(median_dt)
+# view(median_dt)
 part_index_1 <- caret::createDataPartition(median_dt$Over.50K,
                                            times=1,
                                            p = 0.70,
                                            groups=1,
                                            list=FALSE)
-View(part_index_1)
+# View(part_index_1)
 dim(median_dt)
 train <- median_dt[part_index_1,]
 tune_and_test <- median_dt[-part_index_1, ]
@@ -209,7 +210,7 @@ fitControl <- trainControl(method = "repeatedcv",
 #returnResamp - essential verbose, save all of the sampling data
 features <- train[,-"Over.50K"]
 target <- train$Over.50K
-View(target)
+# View(target)
 str(features)
 set.seed(1984)
 median_mdl <- train(x=features,
@@ -273,7 +274,7 @@ confusionMatrix(as.factor(median_predict_test),
 combined_target <- majors$Median * (1 - majors$Unemployment_rate) * majors$ShareWomen
 majors_combined_target <- data.frame(majors, combined_target)
 
-view(majors_combined_target)
+# view(majors_combined_target)
 ```
 
 ```{r}
@@ -364,16 +365,16 @@ combined_RF
 # The "err.rate" argument includes a list of the cumulative error rates
 # for each tree, by class and in aggregate for data points not 
 # included in the tree (OOB).
-View(as.data.frame(combined_RF$err.rate))
+# View(as.data.frame(combined_RF$err.rate))
 
 err.rate <- as.data.frame(combined_RF$err.rate)
 
-View(err.rate)
+# View(err.rate)
 
 # The "oob.times" argument includes the number of times that each data point
 # is not excluded from trees in the random forest.
 
-View(as.data.frame(combined_RF$oob.times))
+# View(as.data.frame(combined_RF$oob.times))
 
 combined_RF_error = data.frame(1:nrow(combined_RF$err.rate),
                                 combined_RF$err.rate)
@@ -383,7 +384,7 @@ colnames(combined_RF_error) = c("Number of Trees", "Out of the Box","<=20K", ">2
 
 combined_RF_error$Diff <- combined_RF_error$'>20K'-combined_RF_error$`<=20K`
 
-View(combined_RF_error)
+# View(combined_RF_error)
 
 # 54 Trees should be used because that amount is correlated to the minimum OOB error and >20K value. 
 ```
