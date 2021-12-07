@@ -137,9 +137,10 @@ round(res, 3)
 ```
 
 ```{r, echo=FALSE}
-head(res, 5)
+head(res, 3)
 ```
 
+The above confusion matrix details the correlation coefficients between all the respective variables with "Total," "Men," and "Women." The correlation coefficient is a measure of the relationship strength between two different variables, with the magnitude closest to 1 or -1 indicating there is a strong direct and/or indirect relationship. Based on the output, it is important to note the differences among the "Employed" between men and women. Comparatively, there is a stronger direct relationship between women being employed (*~0.945*) when compared to men (*~0.878*). Similarly, women are more prone to work part-time (*~0.917*) when compared to men (*~0.894*). On the other hand, when comparing the median variable, which describes the median earnings of full-time year-round workers, women tend to have a slight inverse relationship (*~-0.182*) whereas men have a slight direct relationship (*~0.025*). This is an important dissimilarity, considering women are slightly more employed yet do not payed as much in comparison
 
 ### Data Vizualization
 
