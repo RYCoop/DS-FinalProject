@@ -51,7 +51,7 @@ Based on recent graduates and their characteristics/education, what would be the
 
 ### Background Information
 
-What about the data do we need to know...
+This data is pulled from the 2012-12 American Community Survey Public Use Microdata Series, and is limited to those users under the age of 28. The general purpose of this code and data is based upon the story [linked phrase] (https://fivethirtyeight.com/features/the-economic-guide-to-picking-a-college-major/)
 
 ### Process Overview
 
