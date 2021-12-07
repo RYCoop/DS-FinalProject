@@ -274,7 +274,7 @@ confusionMatrix(as.factor(median_predict_test),
 
 ### Model Building Classification Random Forest
 
-```{r}
+```{r, include=FALSE}
 # Create combined target variable with (inverse of unemployment * median) categories
 combined_target <- majors$Median * (1 - majors$Unemployment_rate) * majors$ShareWomen
 majors_combined_target <- data.frame(majors, combined_target)
@@ -282,7 +282,7 @@ majors_combined_target <- data.frame(majors, combined_target)
 # view(majors_combined_target)
 ```
 
-```{r}
+```{r, include=FALSE}
 # Next let's one-hot encode those factor variables/character 
 majors_combined_target$combined_target <-ifelse(majors_combined_target$combined_target > 20000,1,0)
 
@@ -295,14 +295,14 @@ majors_combined_target <- majors_combined_target %>%
 str(majors_combined_target)
 ```
 
-```{r}
+```{r, echo=FALSE}
 #Determine the baserate or prevalence for the classifier
 
 (prevalence <- table(majors_combined_target$combined_target)[[2]]/length(majors_combined_target$combined_target))
 table(majors_combined_target$combined_target)
 ```
 
-```{r}
+```{r, echo=FALSE}
 # Split data into Train, Tune, Test
 part_index_1 <- caret::createDataPartition(majors_combined_target$combined_target,
                                            times=1,
@@ -324,7 +324,7 @@ dim(tune)
 # these are slightly off because the data set isn't perfectly even
 ```
 
-```{r}
+```{r, echo=FALSE}
 #Calculate the initial mtry level 
 mytry_tune <- function(x){
   y <- dim(x)[2]-1
@@ -334,7 +334,7 @@ mytry_tune <- function(x){
 mytry_tune(majors_combined_target)
 ```
 
-```{r}
+```{r, include=FALSE}
 #Creating an initial random forest model with 500 trees
 set.seed(2023)
 combined_RF = randomForest(combined_target~.,          #<- Formula: response variable ~ predictors.
@@ -364,7 +364,7 @@ combined_RF = randomForest(combined_target~.,          #<- Formula: response var
 combined_RF
 ```
 
-```{r}
+```{r, echo=FALSE}
 # Determining the number of trees that should be used 
 
 # The "err.rate" argument includes a list of the cumulative error rates
@@ -383,7 +383,7 @@ err.rate <- as.data.frame(combined_RF$err.rate)
 
 combined_RF_error = data.frame(1:nrow(combined_RF$err.rate),
                                 combined_RF$err.rate)
-combined_RF_error
+head(combined_RF_error, 10)
 
 colnames(combined_RF_error) = c("Number of Trees", "Out of the Box","<=20K", ">20K")
 
@@ -394,7 +394,7 @@ combined_RF_error$Diff <- combined_RF_error$'>20K'-combined_RF_error$`<=20K`
 # 54 Trees should be used because that amount is correlated to the minimum OOB error and >20K value. 
 ```
 
-```{r}
+```{r, echo=FALSE}
 #Determining the right number of variables to randomly sample (the mtry parameter)
 
 str(train)
@@ -415,7 +415,7 @@ combined_RF_mtry
 ```
 
 
-```{r}
+```{r, include=FALSE}
 # Build Random Forest Classification Model for Combined Category in consideration of the number of trees, the number of variables to sample and the sample size that optimize the model output. 
 set.seed(2023)
 combined_RF_2 = randomForest(combined_target~.,          #<- Formula: response variable ~ predictors.
@@ -451,7 +451,7 @@ combined_RF_2
 
 Because the built in Random Forest Model was not agreeable with the tuning done with the caret library, an original random forest classification tuning metric was created in order to determine the best values for the three hyperparameters determined above.
 
-```{r}
+```{r, echo=FALSE}
 # Tune the model
 customRF <- list(type = "Classification", library = "randomForest", loop = NULL)
 customRF$parameters <- data.frame(parameter = c("mtry", "ntree", "sampsize"), class = rep("numeric", 3), label = c("mtry", "ntree", "sampsize"))
