@@ -51,7 +51,7 @@ Based on recent graduates and their characteristics/education, what would be the
 
 ### Background Information
 
-This data is pulled from the 2012-12 American Community Survey Public Use Microdata Series, and is limited to those users under the age of 28. The general purpose of this code and data is based upon the story [linked phrase] (https://fivethirtyeight.com/features/the-economic-guide-to-picking-a-college-major/)
+This data is pulled from the 2012-12 American Community Survey Public Use Microdata Series, and is limited to those users under the age of 28. The general purpose of this code and data is based upon this [story](https://fivethirtyeight.com/features/the-economic-guide-to-picking-a-college-major/). This story describes the dilemma among college students about choosing the right major, considering the financial benefits of the field and the its maximized chance to graduate. It breaks down the overarching majors like "Engineering" and "STEM," and dives deeper into what each major means in terms of later financial stability and its popularity in comparison to other majors. The actual dataset contains a detailed breakdown about basic earnings as well as labor force information, taking into account sex and the type of job acquired post graduation.
 
 ### Process Overview
 
