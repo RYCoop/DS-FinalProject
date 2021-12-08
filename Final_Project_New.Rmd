@@ -1,0 +1,557 @@
+---
+title: "Final Project"
+author: "Rachael Cooper, Sarah Gould, Nathan Patton, Samarth Saxena"
+date: "11/29/2021"
+output: 
+  html_document:
+    toc: TRUE
+    toc_depth: 5
+    toc_float: TRUE
+    tod_collapsed: TRUE
+    theme: cosmo
+  editor_options:
+    chunk_output_type: console
+    
+---
+
+```{r setup, include=FALSE, cache=TRUE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+# cache --> only have to recompile the changes
+# eval --> runs the code
+# echo --> display the code
+```
+
+```{r, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(knitr)
+library(plotly)
+library(DT)
+library(tidyverse)
+library(randomForest)
+library(rio)
+library(mltools)
+library(data.table)
+library(caret)
+library(pROC)
+library(RColorBrewer)
+```
+
+### Introduction
+
+Many colleges want to optimize the money they receive from their alumni. In order to do so, they need to identify and predict the salary/unemployment rate of recent graduates based on their education and other various factors. Doing so, they will be able to put more money into those programs to get a larger return on their investments (students).
+
+*Business Question:*
+
+Where can colleges put money in order to optimize the amount of money they receive from recent graduates?
+
+*Analysis Question:*
+
+Based on recent graduates and their characteristics/education, what would be their predicted median salary? Would they make over or less than six figures?
+
+### Background Information
+
+This data is pulled from the 2012-12 American Community Survey Public Use Microdata Series, and is limited to those users under the age of 28. The general purpose of this code and data is based upon this [story](https://fivethirtyeight.com/features/the-economic-guide-to-picking-a-college-major/). This story describes the dilemma among college students about choosing the right major, considering the financial benefits of the field and the its maximized chance to graduate. It breaks down the overarching majors like "Engineering" and "STEM," and dives deeper into what each major means in terms of later financial stability and its popularity in comparison to other majors. The actual dataset contains a detailed breakdown about basic earnings as well as labor force information, taking into account sex and the type of job acquired post graduation.
+
+### Process Overview
+
+1) Load & Clean Data
+    a) Classify Variables Correctly
+    b) One-Hot Encoding
+2) Exploratory Data Analysis
+3) Data Visualization 
+4) Build a Linear Regression Model
+    a) Prediction
+5) Build a Random Forest Model
+    a) Calculate mtry Level
+    b) Optimize/Tune the Model
+    c) Evaluation
+6) Fairness Assessment
+7) Summary
+
+### Data Cleaning
+
+A brief look at the raw data can be found below.
+
+```{r, echo = FALSE}
+# Import the raw data
+majors_raw <- read.csv("./recent-grads.csv")
+DT::datatable(majors_raw)
+# Remove rows with missing data
+majors_raw <- na.omit(majors_raw)
+```
+
+```{r, echo=FALSE}
+str(majors_raw)
+```
+
+As can be seen above, many of the categories are integer values. Many of these variables can be converted into factor variables in addition to the numerical ones. In addition, the variables Rank, Major Code, and Major can be dropped as the Rank variable highly correlates with the salary variable, and the other two are to specific and cannot be generalized.
+
+```{r}
+majors_added_categorical <- majors_raw %>% mutate(Over.50K = ifelse(Median > 50000, "Over", "Under.Equal"), High.Unemployment = ifelse(Unemployment_rate > 0.5, "High", "Low")) %>% select(-1, -2, -3)
+```
+
+In addition, the categorical variable categories can be compressed in order for more useful data for the analysis.
+
+```{r, include=FALSE}
+# Changing Categorical Variables into Factor Variables
+majors_factors <- majors_added_categorical %>% mutate_if(sapply(majors_added_categorical, is.character), as.factor)
+# Collapsing Factors
+majors <- majors_factors$Major_category <- fct_collapse(majors_factors$Major_category,
+                             Arts = c("Arts", "Humanities & Liberal Arts", "Industrial Arts & Consumer Services"),
+                             Sciences = c("Agriculture & Natural Resources", "Biology & Life Science", "Health", "Physical Sciences", "Social Science"),
+                             STEM = c("Computers & Mathematics", "Engineering"),
+                             Other = c("Interdisciplinary", "Education", "Psychology & Social Work", "Communications & Journalism", "Business", "Law & Public Policy"))
+```
+
+In order to do some analysis, all categorical variables need to be one hot encoded, which is done below:
+
+```{r}
+# One Hot Encoded Data
+majors_onehot <- one_hot(data.table(majors_factors), cols = c("Major_category", "High.Unemployment"))
+# Normal Data
+majors <- majors_factors
+```
+
+### Exploratory Data Analysis
+
+Before beginning with the analytical part of the exploration, it is beneficial to visualize and summarize the data in order to get a better understanding of the data in its entirety, and with an emphasis on variables you believe to be important for your analysis. 
+
+The following is the 5 number summary of the median salary variable. 
+
+```{r, echo=FALSE}
+# Summary of Median variable
+summary(majors$Median)
+```
+
+The median of the medians is 36,000, with a max salary 110,000.
+
+```{r, include=FALSE}
+# Correlation Matrix -> Which variables have the highest correlation with one another
+dat <- majors %>% select(-4, -19, -20)
+dat <- as_tibble(dat, na.rm = TRUE)
+# creating the correlation matrix
+res <- cor(dat, use = "complete.obs")
+round(res, 3)
+```
+
+```{r, echo=FALSE}
+head(res, 3)
+```
+
+The above confusion matrix details the correlation coefficients between all the respective variables with "Total," "Men," and "Women." The correlation coefficient is a measure of the relationship strength between two different variables, with the magnitude closest to 1 or -1 indicating there is a strong direct and/or indirect relationship. Based on the output, it is important to note the differences among the "Employed" between men and women. Comparatively, there is a stronger direct relationship between women being employed (~0.945) when compared to men (~0.878). Similarly, women are more prone to work part-time (~0.917) when compared to men (~0.894). On the other hand, when comparing the median variable, which describes the median earnings of full-time year-round workers, women tend to have a slight inverse relationship (~ -0.182) whereas men have a slight direct relationship (~0.025). This is an important dissimilarity, considering women are slightly more employed yet do not payed as much in comparison
+
+### Data Vizualization
+
+Now, we can visualize the dataset. To do this, we used the ggplot and plot_ly packages. 
+
+#### Polar Chart for the Number of Observations in Each Major Category 
+
+```{r, echo=FALSE}
+# Polar Chart to understand the sampling (how many in each category)
+# This will be important when connecting the results back to a real world application
+ggplot(majors, 
+       aes(x = Major_category)) + 
+  geom_bar(fill = brewer.pal(4, "Set3")) +
+  coord_polar()
+```
+
+As can be seen above, the first graph we created is a polar graph. A polar graph allows the reader to understand the sampling distribution, as well as the amount of representation each major category has in the dataset. The larger the slice, the more representation the category has in the dataset. From the polar chart, Sciences has the largest amount of representation, followed closely by the Other category. STEM is third, but by a large margin, and Arts is last.
+
+#### Stacked Bar Graph for the Percent Over 50K and Under/Equal to 50K for Each Major Category
+
+```{r, echo=FALSE}
+# Stacked Bar Graph
+ggplot(majors, 
+       aes(x = Major_category, 
+           fill = Over.50K)) + 
+  geom_bar(position = "fill")
+```
+
+The next graph we created was a stacked bar graph. The major category is on the x-axis, while the count - normalized to be between 0 and 1 - is on the y-axis. The fill of the graph is based on whether or not a person from that category has a median salary that is larger than $50,000. From this graph, it seems that STEM majors have almost 50 percent of their category making above 50K per year - the largest percentage of the four major categories. The other three major categories are nowhere close to STEM, with the Other category coming in second with about 7 percent of their category making above 50K. Science is third with what seems to be about 1 percent of their category making above 50K, and Art is last with what seems to be 0 percent of their category making above 50K per year.
+
+#### Box Plots for the Different Major Categories
+
+```{r, echo=FALSE}
+# Box Plots
+ggplot(majors, aes(x = Major_category, y = Median)) +
+  geom_boxplot(fill = brewer.pal(4, "Set3"),
+               color = "turquoise",
+               outlier.color = "pink") +
+   coord_flip()
+```
+
+For our third graph, we decided to make a box-plot graph where the x-axis is the median salary and the y-axis is the four major categories. From this graph, it can be deduced that the range of STEM majors is higher than that of any other major. The range of STEM majors seems to be about 40-50K, whereas the other majors have a maximum range of 30K. There is a STEM major who currently has a median salary of 120K, which is almost double the highest median salary of any other major category. Another interesting aspect about the STEM box-plot, when compared to the other three, is that the median salary for the 25th percentile of STEM is equal to about 45K, which is higher than the median salary of the 75th percentile for any other category. The other three boxplots are relatively similar to each other, with the Art category being much skinnier than the other two. The skinnier the graph, the smaller the range of the graph.
+
+#### 3D Plot for the Median Salary Based on the Unemployment Rate, Share of Women, and Number of Low Wage Jobs
+
+```{r, echo=FALSE}
+# Pre-analysis Data Visualization
+# Use plotly to do a 3d imaging ~ is unique to plotly & means use all the layers
+fig <- plot_ly(majors, 
+               type = "scatter3d",
+               mode="markers",
+               symbol = "circle",
+               x = ~Unemployment_rate, 
+               y = ~ShareWomen,
+               z = ~Low_wage_jobs,
+               marker = list(color = ~Median, colorscale = "Viridis", showscale = TRUE), 
+               # hover text (shows up when we hover over a point)
+               text = ~paste('Salary Median:', Median,
+                             'unemployement Rate:', Unemployment_rate))
+fig
+# dev.off()
+```
+
+Our final graph above is a three-dimensional scatterplot. The unemployment rate on a scale of 0-1 is on the x-axis, the share of women as a decimal is on the y-axis, and the z-axis has the salary of the low-wage jobs that people work. The color of the marker is dependent on how much money each person makes, and uses a gradient color scheme. From the graph, it can be determined that women do not make as much money as men as they are working in lower-wage jobs and have higher rates of unemployment. Another interesting thing to note is that only one student overall made above a 100K median salary.
+
+### Model Building Linear Regression
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+set.seed(1515)
+# Build Linear Regression Model for Median category
+median_dt <- majors_onehot[,-c("Over.50K")]
+# view(median_dt)
+part_index_1 <- caret::createDataPartition(median_dt$Median,
+                                           times=1,
+                                           p = 0.70,
+                                           groups=1,
+                                           list=FALSE)
+# View(part_index_1)
+train <- median_dt[part_index_1,]
+tune_and_test <- median_dt[-part_index_1, ]
+#The we need to use the function again to create the tuning set 
+tune_and_test_index <- createDataPartition(tune_and_test$Median,
+                                           p = .5,
+                                           list = FALSE,
+                                           times = 1)
+tune <- tune_and_test[tune_and_test_index, ]
+test <- tune_and_test[-tune_and_test_index, ]
+# dim(train)
+# dim(tune)
+# dim(test)
+#Cross validation process 
+fitControl <- trainControl(method = "repeatedcv",
+                          number = 10,
+                          repeats = 5, 
+                          returnResamp="all",
+                          savePredictions = 'final') 
+# number - number of folds
+# repeats - number of times the CV is repeated, here it's 5 take the average of
+# those 5 repeats
+#returnResamp - essential verbose, save all of the sampling data
+features <- train[,-"Median"]
+target <- train$Median
+# View(target)
+# str(features)
+set.seed(1515)
+median_mdl <- train(x=features,
+                    y=target,
+                    trControl=fitControl,
+                    method="lm",
+                    verbose=TRUE)
+```
+
+Building a base multiple linear regression model:
+
+```{r}
+median_mdl
+```
+
+The linear regression outputted an RMSE of 2968.04, an R-squared of 0.9299, and an MAE of 2141.409. The R-squared value is very close to one, which is very good for a linear regression model. RMSE is the root-mean square error and is a standard way to measure the error for a model. Because our data was in the thousands, the resulting RMSE is respectable in this case. The R-squares evaluates the scatter of the data points in relation to the fitted regression line. A higher number means that there is higher correlation to the chosen line and the scatter of the data points. The MAE is the mean absolute error and indicates the average absolute difference between the observations. The MAE is a fairly good value in context of the overarching problem.
+
+```{r}
+summary(median_mdl)
+```
+
+The resulting coefficients for the multiple linear regression are found above. The y-intercept in this context is the amount of yearly earnings (median) someone would have if all of the other variables were set to 0. This does not really make sense in the real-world. The interpretation for each of the slope variables is the same as simple linear regression, BUT all the other variables have to be fixed. For example, if all the other variables are fixed, then for every 1 unit increase in someones P25th percentile, their median salary earned increases by 0.64 dollars. All the other variables need to be fixed because it will change the interpretation.
+
+#### Prediction 
+
+With the built model, we can now use it to predict.
+
+```{r, echo=FALSE}
+# Predict Linear Regression Model
+predict.data <- data.frame(Total=3000, Men=500, Women=500, Major_category_Sciences=0, Major_category_Arts=0, Major_category_Other=0, Major_category_STEM=1, ShareWomen=0.76, Sample_size=4000, Employed=300, Full_time=234, Part_time=0, Full_time_year_round=100, Unemployed=20, Unemployment_rate=0, P25th=20000, P75th=120000, College_jobs=3343, Non_college_jobs=2, Low_wage_jobs=223, High.Unemployment_Low=0)
+predict(median_mdl, predict.data, interval = "predict")
+```
+
+Using random values for the inputs of the multiple linear regression model,  we can predict an actual value for the median salary. In this case, the predicted outcome for the following inputs 
+
+Total=3000, Men=500, Women=500, Major_category_Sciences=0, Major_category_Arts=0, Major_category_Other=0, Major_category_STEM=1, ShareWomen=0.76, Sample_size=4000, Employed=300, Full_time=234, Part_time=0, Full_time_year_round=100, Unemployed=20, Unemployment_rate=0, P25th=20000, P75th=120000, College_jobs=3343, Non_college_jobs=2, Low_wage_jobs=223, High.Unemployment_Low=0
+
+is 52904.95 dollars.
+
+#### Evaluation 
+
+```{r, echo=FALSE}
+# Evaluate the linear regression model
+varImp(median_mdl)
+```
+
+Relating to the model, the most important variable was 'P25th' with an overall importance of 100% when predicting the salary (median) variable. Similar to that variables, 'Major_category_Other' and 'P75th' were also important variables that relate to the prediction of the median classifier variable, with an overall importance of approximately 22.5% and 78% respectively. These are viable results, given that one's percentile of earnings and the major they choose are fairly telling signs of someone's future salary.
+
+### Model Building Classification Random Forest
+
+First, a combined target variable was created consisting of the median salary, the employment rate (1 - Unemployment Rate), and the percentage of women (Share of Women). The resulting combined target is the Median salary multiplied by the employment rate multiplied by the share of women: 
+
+combined_target <- Median * (1 - Unemployment_rate) * ShareWomen
+
+A new data frame was created which combined the original majors data frame with the combined_target variable.
+
+```{r, include=FALSE}
+# Create combined target variable with (inverse of unemployment * median) categories
+combined_target <- majors$Median * (1 - majors$Unemployment_rate) * majors$ShareWomen
+majors_combined_target <- data.frame(majors, combined_target)
+# view(majors_combined_target)
+```
+
+```{r, include=FALSE}
+# Next let's one-hot encode those factor variables/character 
+majors_combined_target$combined_target <-ifelse(majors_combined_target$combined_target > 20000,1,0)
+#added this a predictor versus replacing the numeric version
+(majors_combined_target$combined_target <- cut(majors_combined_target$combined_target,c(-1,0.3953488,1),labels = c(0,1)))
+majors_combined_target$combined_target <- fct_collapse(majors_combined_target$combined_target, "LE.EQ.20K"="0", "G.20K"="1")
+majors_combined_target <- majors_combined_target %>%
+  mutate(combined_target = factor(combined_target, labels = make.names(levels(combined_target))))
+str(majors_combined_target)
+```
+
+```{r, echo=FALSE}
+#Determine the baserate or prevalence for the classifier
+(prevalence <- table(majors_combined_target$combined_target)[[2]]/length(majors_combined_target$combined_target))
+# table(majors_combined_target$combined_target)
+```
+
+The initial baserate for the classifier variable, combined variable, is approximately *0.3953*, representative of the percentage of positive entries in relation to all of the entries for the combined variable. When building a classifier, the lower the baserate is, the better the associated model should be at efficiently predicting the positive entries. For example, if a model had an initial baserate of 75% and a model accuracy of 50%, that would be a better fitted model than if the original baserate was 25% comparatively.
+
+```{r, include=FALSE}
+set.seed(1)
+# Split data into Train, Tune, Test
+part_index_1 <- caret::createDataPartition(majors_combined_target$combined_target,
+                                           times=1,
+                                           p = 0.70,
+                                           groups=1,
+                                           list=FALSE)
+train <- majors_combined_target[part_index_1, ]
+tune_and_test <- majors_combined_target[-part_index_1, ]
+#The we need to use the function again to create the tuning set 
+tune_and_test_index <- createDataPartition(tune_and_test$combined_target,
+                                           p = .5,
+                                           list = FALSE,
+                                           times = 1)
+tune <- tune_and_test[tune_and_test_index, ]
+test <- tune_and_test[-tune_and_test_index, ]
+dim(train)
+dim(test)
+dim(tune)
+# these are slightly off because the data set isn't perfectly even
+```
+
+
+```{r, echo=FALSE}
+#Calculate the initial mtry level 
+mytry_tune <- function(x){
+  y <- dim(x)[2]-1
+  sqrt(y)
+}
+mytry_tune(majors_combined_target)
+```
+
+The mtry parameter in the random forest algorithm defines the number of variables randomly sampled as candidates for each split. The default number of this classification would be the square root of the number of variables. As indicated in the above output, the default mtry should be 4, rounded down from the 4.47 value.
+
+```{r, include=FALSE}
+#Creating an initial random forest model with 500 trees
+set.seed(1)
+combined_RF = randomForest(combined_target~.,          #<- Formula: response variable ~ predictors.
+                            #   The period means 'use all other variables in the data'.
+                            train,     #<- A data frame with the variables to be used.
+                            #y = NULL,           #<- A response vector. This is unnecessary because we're specifying a response formula.
+                            #subset = NULL,      #<- This is unnecessary because we're using all the rows in the training data set.
+                            #xtest = NULL,       #<- This is already defined in the formula by the ".".
+                            #ytest = NULL,       #<- This is already defined in the formula by "PREGNANT".
+                            ntree = 500,        #<- Number of trees to grow. This should not be set to too small a number, to ensure that every input row gets classified at least a few times.
+                            mtry = 4,            #<- Number of variables randomly sampled as candidates at each split. Default number for classification is sqrt(# of variables). Default number for regression is (# of variables / 3).
+                            replace = TRUE,      #<- Should sampled data points be replaced.
+                            #classwt = NULL,     #<- Priors of the classes. Use this if you want to specify what proportion of the data SHOULD be in each class. This is relevant if your sample data is not completely representative of the actual population 
+                            #strata = NULL,      #<- Not necessary for our purpose here.
+                            sampsize = 100,      #<- Size of sample to draw each time.
+                            nodesize = 5,        #<- Minimum numbers of data points in terminal nodes.
+                            #maxnodes = NULL,    #<- Limits the number of maximum splits. 
+                            importance = TRUE,   #<- Should importance of predictors be assessed?
+                            #localImp = FALSE,   #<- Should casewise importance measure be computed? (Setting this to TRUE will override importance.)
+                            proximity = FALSE,    #<- Should a proximity measure between rows be calculated?
+                            norm.votes = TRUE,   #<- If TRUE (default), the final result of votes are expressed as fractions. If FALSE, raw vote counts are returned (useful for combining results from different runs).
+                            do.trace = TRUE,     #<- If set to TRUE, give a more verbose output as randomForest is run.
+                            keep.forest = TRUE,  #<- If set to FALSE, the forest will not be retained in the output object. If xtest is given, defaults to FALSE.
+                            keep.inbag = TRUE)   #<- Should an n by ntree matrix be returned that keeps track of which samples are in-bag in which trees? 
+```
+
+```{r}
+# Look at the output of the random forest.
+combined_RF$confusion
+# check the accuracy of the model
+combined_RF_acc = (sum(combined_RF$confusion[row(combined_RF$confusion) ==
+                                  col(combined_RF$confusion)]) /sum(combined_RF$confusion))*100
+print(paste("Model Accuracy:", combined_RF_acc, "%"))
+```
+
+As indicated in the confusion matrix of the random forest model, the class error for the negative class ("LE.EQ.20K") is approximately *9.59%*. This is a considerably good value as the error is fairly close to 0. On the other hand, the positive class has an approximate class error of *25.00%*. The positive class, characterized by those the combined variable over 20K, is the variable being predicted so it is important that the error for that particular class is minimized as much as possible in further optimization for the model. Overall, the model is rather accurate, with an approximate accuracy of *84.057%* attributed to the low class error for the negative. As a model, it is not bad, but should be properly optimized to minimize the positive class error to avoid an increased amount of false positives and false negatives.
+
+#### Tuning
+
+```{r, echo=FALSE}
+# Determining the number of trees that should be used 
+# The "err.rate" argument includes a list of the cumulative error rates
+# for each tree, by class and in aggregate for data points not 
+# included in the tree (OOB).
+# View(as.data.frame(combined_RF$err.rate))
+err.rate <- as.data.frame(combined_RF$err.rate)
+# View(err.rate)
+# The "oob.times" argument includes the number of times that each data point
+# is not excluded from trees in the random forest.
+# View(as.data.frame(combined_RF$oob.times))
+combined_RF_error = data.frame(1:nrow(combined_RF$err.rate),
+                                combined_RF$err.rate)
+colnames(combined_RF_error) = c("Number of Trees", "Out of the Box","<=20K", ">20K")
+combined_RF_error$Diff <- combined_RF_error$'>20K'-combined_RF_error$`<=20K`
+# sort OOB and "G.50K" in ascending order
+minTrees <- combined_RF_error[order(combined_RF_error[,2], combined_RF_error[,4]),]
+head(minTrees,1) # output the top result
+# View(combined_RF_error)
+# 59 Trees should be used because that amount is correlated to the minimum OOB error and >20K value. 
+```
+After building the initial random forest algorithm, it will be helpful to use the class error rates as well as the OOB error rate to identify the most optimal number of trees to tune the model. In order to identify such a value, the respective error rates from the model were converted into a data frame that was then ordered in descending order for both the OOB column and the positive class (">20K") column. The top row should therefore contain the number of trees that encapsulates the minimum OOB error and positive class error rate for that particular algorithm. For this current algorithm, it would be benefical when optimizing to use *59* as the value for the number of trees when building the random forest model.
+
+
+```{r, echo=FALSE}
+#Determining the right number of variables to randomly sample (the mtry parameter)
+set.seed(2)
+combined_RF_mtry = tuneRF(data.frame(train[ ,1:20]),  #<- data frame of predictor variables
+                           (train[ ,21]),              #<- response vector (variables), factors for classification and continuous variable for regression
+                           mtryStart = 4,                        #<- starting value of mtry, the default is the same as in the randomForest function
+                           ntreeTry = 59,                        #<- number of trees used at the tuning step, let's use the same number as we did for the random forest
+                           stepFactor = 2,                       #<- at each iteration, mtry is inflated (or deflated) by this value
+                           improve = 0.05,                       #<- the improvement in OOB error must be by this much for the search to continue
+                           trace = TRUE,                         #<- whether to print the progress of the search
+                           plot = TRUE,                          #<- whether to plot the OOB error as a function of mtry
+                           doBest = TRUE)                       #<- whether to create a random forest using the optimal mtry parameter
+#Based on the output of the combined_RF_mtry, it looks like 16 variables is the right number of variables to sample becauses it has the least OOB error compared to 2,4,8, and 20. 
+```
+
+Similar to identifying the most optimal number of trees, the value for mtry that is correlated to the lowest possible OOB error rate would be the most beneficial to use when generating any further random forest algorithms. Based on the outputted graph, the value of *16* of mtry was more optimal when compared to the previous default of *4* for the model. The difference between the individual values for 16 and 20 for mtry are rather small but when compared to the smaller values, this will be important to make note of when optimizing the model in the future.
+
+
+```{r}
+combined_RF_mtry
+```
+
+After adjusting for the model optimizations, there has been a large decrease in the accuracy for both the positive and negative class errors. The positive class ("G.20K") has a class error of approximately *9.59%* and the negative class ("LE.EQ.20K") has a class error of approximately *8.33%*. Both values are very optimal given that they are fairly close to 0. Future adjustments can be made but that is a positive improvement to build off of.
+
+
+```{r, include=FALSE}
+# Build Random Forest Classification Model for Combined Category in consideration of the number of trees, the number of variables to sample and the sample size that optimize the model output. 
+set.seed(2023)
+combined_RF_2 = randomForest(combined_target~.,          #<- Formula: response variable ~ predictors.
+                            #   The period means 'use all other variables in the data'.
+                            train,     #<- A data frame with the variables to be used.
+                            #y = NULL,           #<- A response vector. This is unnecessary because we're specifying a response formula.
+                            #subset = NULL,      #<- This is unnecessary because we're using all the rows in the training data set.
+                            #xtest = NULL,       #<- This is already defined in the formula by the ".".
+                            #ytest = NULL,       #<- This is already defined in the formula by "PREGNANT".
+                            ntree = 59,        #<- Number of trees to grow. This should not be set to too small a number, to ensure that every input row gets classified at least a few times.
+                            mtry = 16,            #<- Number of variables randomly sampled as candidates at each split. Default number for classification is sqrt(# of variables). Default number for regression is (# of variables / 3).
+                            replace = TRUE,      #<- Should sampled data points be replaced.
+                            #classwt = NULL,     #<- Priors of the classes. Use this if you want to specify what proportion of the data SHOULD be in each class. This is relevant if your sample data is not completely representative of the actual population 
+                            #strata = NULL,      #<- Not necessary for our purpose here.
+                            sampsize = 100,      #<- Size of sample to draw each time.
+                            nodesize = 5,        #<- Minimum numbers of data points in terminal nodes.
+                            #maxnodes = NULL,    #<- Limits the number of maximum splits. 
+                            importance = TRUE,   #<- Should importance of predictors be assessed?
+                            #localImp = FALSE,   #<- Should casewise importance measure be computed? (Setting this to TRUE will override importance.)
+                            proximity = FALSE,    #<- Should a proximity measure between rows be calculated?
+                            norm.votes = TRUE,   #<- If TRUE (default), the final result of votes are expressed as fractions. If FALSE, raw vote counts are returned (useful for combining results from different runs).
+                            do.trace = TRUE,     #<- If set to TRUE, give a more verbose output as randomForest is run.
+                            keep.forest = TRUE,  #<- If set to FALSE, the forest will not be retained in the output object. If xtest is given, defaults to FALSE.
+                            keep.inbag = TRUE)   #<- Should an n by ntree matrix be returned that keeps track of which samples are in-bag in which trees? 
+#The sample size of the model was kept at the original value of 100, because it was found that this value minimized the class error as much as possible for both classes. When the sample size was increased or decreased, one of the class errors tends to fall, but the other rises significantly. Therefore, this is the best sample size that will minimize class errors, and prevent over or under fitting of the data.
+```
+
+```{r}
+# Look at the output of the random forest.
+combined_RF_2$confusion
+# check the accuracy of the model
+combined_RF_2_acc = (sum(combined_RF_2$confusion[row(combined_RF_2$confusion) ==
+                                  col(combined_RF_2$confusion)]) /sum(combined_RF_2$confusion))*100
+print(paste("Model Accuracy:", combined_RF_2_acc, "%"))
+```
+
+Compared to the initial model, this current random forest model is much more optimal. The class error for both the positive and negative classes were approximately *12%*. There is a slight drawback regarding the negative class given that the previous class error was approximately *9.59%*. However, this is still favorable because the positive class decreased a large percentage and that is the variable that is being predicted, so it is therefore prioritized. Additionally, the accuracy of the model increased slightly from about *84.057%* previously to now *87.423%* which is also favorable. This increase can be attributed to the lower class error for the positive class. As a model, it still requires some improvements in order to decrease the positive class error to be as close to 0 as possible.
+
+#### Evaluation 
+
+```{r, include = FALSE}
+evaluateTree <- function(randomForrest, tuneOrTest) {
+  RF_predict = predict(
+    randomForrest,
+    tuneOrTest,
+    type = "response",
+    predict.all = TRUE,
+    proximity = FALSE
+    )
+  RF_tune_pred = data.frame(tuneOrTest, Prediction = RF_predict$aggregate)
+  # manually create a confusion matrix
+  RF_tune_matrix = table(RF_tune_pred$combined_target, RF_tune_pred$Prediction)
+  # output the error for the randomForest algorithm
+  error_rate_RF = sum(RF_tune_matrix[row(RF_tune_matrix) != col(RF_tune_matrix)]) / sum(RF_tune_matrix)
+  error_rate_RF
+  # output the confusion matrix via caret package
+  library(caret)
+  confusionMatrix(
+    RF_tune_pred$Prediction,
+    RF_tune_pred$combined_target,
+    positive = "G.20K",
+    dnn = c("Prediction", "Actual"),
+    mode = "everything"
+    )
+}
+```
+
+```{r, echo=F}
+# calculate the original accuracy & F1 score
+eval1 <-evaluateTree(combined_RF, test)
+eval1_F1 <- eval1$byClass[7]*100
+eval1_Acc <- eval1$overall[1]*100
+print(paste("Original Algorithm F1 Score:", eval1_F1, "%"))
+print(paste("Original Algorithm Accuracy:", eval1_Acc, "%"))
+```
+
+```{r, echo=FALSE}
+# calculate the new model's accuracy & F1 score
+eval2 <-evaluateTree(combined_RF_2, test)
+eval2_F1 <- eval2$byClass[7]*100
+eval2_Acc <- eval2$overall[1]*100
+print(paste("Optimized Algorithm F1 Score:", eval2_F1, "%"))
+print(paste("Optimized Algorithm Accuracy:", eval2_Acc, "%"))
+```
+
+In comparison to previous evaluations, this final model has an increase in both accuracy and F1 score when predicted with the test test. The original evaluation of the model had an accuracy of approximately *81.818%* and a F1 score of approximately *84%*. After adjusting hyper-parameters and tuning the model, the final evaluation of the model does have a positive increase in both accuracy (*92%*) and F1 (*90.909%*) which is a favorable. The increases aren’t super significant which can be attributed to the nature of the data and the inability for the model to continue to be optimized to a large degree even with improving parameters. Overall, the model is pretty good and has been well optimized as the value for both F1 and the accuracy is fairly close to 100%, which would be the most optimal.
+
+### Fairness Assesment
+
+I believe that our model is fair and accounts for the singular protected class present in our dataset - women. Our dataset has a variable that accounts for the percentage of the workforce that women hold. Because of this, the models that we create are able to determine whether women are being treated fairly in the workplace or not. For example, our linear regression model is able to output that women are being paid an unfair median salary based on the amount of the market share they have. If our dataset did not have the Sharewomen variable, our model would not be able to determine whether women are being paid fairly or not.
+
+### Conclusion
+
+What can you say about the results of the methods section as it relates to your question given the limitations to your model?
+
+Our business question was how should colleges allocate money in order to optimize the amount of donation money they receive from recent graduates. In other words, based on recent graduates and their characteristics and education, what would be their predicted median salary (assuming a higher median salary leads to the student donating more money)? From the data visualization, it can be deduced that the college/university should be putting money into the majors that are under the STEM category. STEM majors have a much higher median salary, a larger range of median salary, and a lower unemployment rate. Thus, they will have more expendable income to potentially donate back to the college as alumni.
+
+From the linear regression model, we can see how the median salary is affected by all of the other variables. It can be seen that for every 1 unit of increase in someone's 25th percentile of their median salary, their median salary increases by 0.64 units. From the random forest model, a combined target variable of a created consisting of the median salary, the employment rate (1 - unemployment rate), and the percentage of women in the workplace (sharewomen). Using this, we were able to predict the values for this target variable and find the values that impacted the target variable the most.
+
+Overall, based on our analysis, the college/university that asked us to do this analysis should allocate money towards the STEM major category, as they have the highest median salary and the highest range of salary, which means they would donate more money back to their original school. Being a STEM major also lowers the chance that an alumni is unemployed or is working in a low wage job.
+
+### Future Recommendations
+
+One additional piece of analysis that would benefit the report as a whole is using recently recorded data. The data that was used in this analysis was recorded from 2010-2012, so the trends that were discovered from our analysis are most likely outdated. Having new data would greatly benefit the university that wanted this report, as they would be able to adjust major categories based on newer trends rather than older ones. Another additional piece of analysis that would benefit our report would be the addition of the decision tree model. In our analysis, we included linear regression and the random forest model. However, we never include the decision tree model, which would have allowed us to see a model where the most optimal choice was made every time - since the decision tree is a greedy algorithm by nature. Including the decision tree would have made our analysis more diverse and well-rounded, as we would have had performed an analysis using three different major analytic methods. Personally, we don't believe that anything limited our analysis on the project - the dataset was easy to work with and the models that we created learned the data efficiently and effectively. 
+
