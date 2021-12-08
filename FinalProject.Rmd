@@ -278,9 +278,15 @@ From the generated confusion matrix, the most useful metrics for analysis would 
 
 #### Evaluation 
 
-```{r, echo=FALSE, warning=FALSE, message=FALSE}
+```{r, include=FALSE}
 # Evaluate the linear regression model
-varImp(median_mdl)
+# varImp(median_mdl)
+# Relating to the model, the most important variables were 'ShareWoman', 'P25th,' 'Major_category_Sciences,' and 'P75th' all with an overall respective importance of 100% when predicting the salary (median) variable. Similar to those variables, 'Major_category_STEM' is also an important variables that relate to the prediction of the median classifier variable, with an overall importance of approximately 95%. These are viable results, given that one's percentile of earnings and the category for which their majory is categorized, should all have a high influence of one's respective yearly earnings. 
+```
+
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
 grid <- expand.grid(.winnow = c(TRUE,FALSE), 
                     .trials=c(20,30,40), 
                     .model=c("tree","rules"))
@@ -332,10 +338,11 @@ str(majors_combined_target)
 
 ```{r, echo=FALSE}
 #Determine the baserate or prevalence for the classifier
-
 (prevalence <- table(majors_combined_target$combined_target)[[2]]/length(majors_combined_target$combined_target))
-table(majors_combined_target$combined_target)
+# table(majors_combined_target$combined_target)
 ```
+
+The initial baserate for the classifier variable, median, is approximately *0.3953*, representative of the percentage of positive entries in relation to all of the entries for the median variable. When building a classifier, the lower the baserate is, the better the associated model should be at efficiently predicting the positive entries. For example, if a model had an initial baserate of 75% and a model accuracy of 50%, that would be a better fitted model than if the original baserate was 25% comparatively.
 
 ```{r, echo=FALSE}
 # Split data into Train, Tune, Test
