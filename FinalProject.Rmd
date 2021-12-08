@@ -476,6 +476,7 @@ combined_RF_mtry = tuneRF(data.frame(train[ ,1:20]),  #<- data frame of predicto
 
 #Based on the output of the combined_RF_mtry, it looks like 16 variables is the right number of variables to sample becauses it has the least OOB error compared to 2,4,8, and 20. 
 ```
+
 Similar to identifying the most optimal number of trees, the value for mtry that is correlated to the lowest possible OOB error rate would be the most beneficial to use when generating any further random forest algorithms. Based on the outputted graph, the value of *16* of mtry was more optimal when compared to the previous default of *4* for the model. The difference between the individual values for 16 and 20 for mtry are rather small but when compared to the smaller values, this will be important to make note of when optimizing the model in the future.
 
 
@@ -526,8 +527,7 @@ combined_RF_2_acc = (sum(combined_RF_2$confusion[row(combined_RF_2$confusion) ==
 print(paste("Model Accuracy:", combined_RF_2_acc, "%"))
 ```
 
-
-
+Compared to the initial model, this current random forest model is much more optimal. The class error for both the positive and negative classes were approximately *12%*. There is a slight drawback regarding the negative class given that the previous class error was approximately *9.59%*. However, this is still favorable because the positive class decreased a large percentage and that is the variable that is being predicted, so it is therefore prioritized. Additionally, the accuracy of the model increased slightly from about *84.057%* previously to now *87.423%* which is also favorable. This increase can be attributed to the lower class error for the positive class. As a model, it still requires some improvements in order to decrease the positive class error to be as close to 0 as possible.
 
 #### Tuning
 
@@ -602,12 +602,21 @@ mdl
 
 ### Fairness Assesment
 
+I believe that our model is fair and accounts for the singular protected class present in our dataset - women. Our dataset has a variable that accounts for the percentage of the workforce that women hold. Because of this, the models that we create are able to determine whether women are being treated fairly in the workplace or not. For example, our linear regression model is able to output that women are being paid an unfair median salary based on the amount of the market share they have. If our dataset did not have the Sharewomen variable, our model would not be able to determine whether women are being paid fairly or not.
+
+
 ### Conclusion
 
 What can you say about the results of the methods section as it relates to your question given the limitations to your model?
+
+Our business question was how should colleges allocate money in order to optimize the amount of donation money they receive from recent graduates. In other words, based on recent graduates and their characteristics and education, what would be their predicted median salary (assuming a higher median salary leads to the student donating more money)? From the data visualization, it can be deduced that the college/university should be putting money into the majors that are under the STEM category. STEM majors have a much higher median salary, a larger range of median salary, and a lower unemployment rate. Thus, they will have more expendable income to potentially donate back to the college as alumni. From the linear regression model, 
+
+
+From the random forest model, 
 
 ### Future Recommendations
 
 What additional analysis is needed or what limited your analysis on this project?
 
-hello
+One additional piece of analysis that would benefit the report as a whole is using recently recorded data. The data that was used in this analysis was recorded from 2010-2012, so the trends that were discovered from our analysis are most likely outdated. Having new data would greatly benefit the university that wanted this report, as they would be able to adjust major categories based on newer trends rather than older ones. Another additional piece of analysis that would benefit our report would be the addition of the decision tree model. In our analysis, we included linear regression and the random forest model. However, we never include the decision tree model, which would have allowed us to see a model where the most optimal choice was made every time - since the decision tree is a greedy algorithm by nature. Including the decision tree would have made our analysis more diverse and well-rounded, as we would have had performed an analysis using three different major analytic methods. Personally, we don't believe that anything limited our analysis on the project - the dataset was easy to work with and the models that we created learned the data efficiently and effectively. 
+
