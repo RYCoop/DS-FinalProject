@@ -8,8 +8,7 @@ output:
     toc_depth: 5
     toc_float: TRUE
     tod_collapsed: TRUE
-    theme: 
-      bootswatch: cosmo
+    theme: cosmo
   editor_options:
     chunk_output_type: console
     
@@ -143,7 +142,7 @@ head(res, 3)
 
 The above confusion matrix details the correlation coefficients between all the respective variables with "Total," "Men," and "Women." The correlation coefficient is a measure of the relationship strength between two different variables, with the magnitude closest to 1 or -1 indicating there is a strong direct and/or indirect relationship. Based on the output, it is important to note the differences among the "Employed" between men and women. Comparatively, there is a stronger direct relationship between women being employed (~0.945) when compared to men (~0.878). Similarly, women are more prone to work part-time (~0.917) when compared to men (~0.894). On the other hand, when comparing the median variable, which describes the median earnings of full-time year-round workers, women tend to have a slight inverse relationship (~ -0.182) whereas men have a slight direct relationship (~0.025). This is an important dissimilarity, considering women are slightly more employed yet do not payed as much in comparison
 
-### Data Visualization
+### Data Vizualization
 
 Now, we can visualize the dataset. To do this, we used the ggplot and plot_ly packages. 
 
@@ -206,6 +205,7 @@ Our final graph above is a three-dimensional scatterplot. The unemployment rate 
 ### Model Building Linear Regression
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
+set.seed(1515)
 # Build Linear Regression Model for Median category
 median_dt <- majors_onehot[,-c("Median")]
 # view(median_dt)
@@ -225,9 +225,9 @@ tune_and_test_index <- createDataPartition(tune_and_test$Over.50K,
                                            times = 1)
 tune <- tune_and_test[tune_and_test_index, ]
 test <- tune_and_test[-tune_and_test_index, ]
-dim(train)
-dim(tune)
-dim(test)
+# dim(train)
+# dim(tune)
+# dim(test)
 #Cross validation process 
 fitControl <- trainControl(method = "repeatedcv",
                           number = 10,
@@ -242,7 +242,7 @@ features <- train[,-"Over.50K"]
 target <- train$Over.50K
 # View(target)
 str(features)
-set.seed(1984)
+set.seed(1515)
 median_mdl <- train(x=features,
                     y=target,
                     trControl=fitControl,
@@ -255,7 +255,7 @@ median_mdl <- train(x=features,
 median_mdl
 ```
 
-Based on the accuracies and the respective kappa values for each set of trials, both with and without winnowing, the final model was chosen with 1 trial and without winnowing. This indicates that the lowest possible number of boosting iterations is favorable. The accuracy for winnowing with 20 trials was approximately 0.8834 and comparatively the accuracy for no winnowing with 1 trials was approximately 0.9295. Based on those values, the difference between the number of trials along with factoring in no winnowing or winnowing was a good amount; therefore, it is important to highlight that no winnowing and a small trial number would be the most suitable option for constructing this model.
+Based on the accuracies and the respective kappa values for each set of trials, both with and without winnowing, the final model was chosen with 1 trial and with no winnowing. This indicates that the lowest possible number of boosting iterations is favorable. The accuracy for winnowing with 20 trials was approximately 0.8978 and comparatively the accuracy for no winnowing with 1 trials was approximately 0.9311. Based on those values, the difference between the number of trials along with factoring in no winnowing or winnowing was a good amount; therefore, it is important to highlight that no winnowing and a small trial number would be the most suitable option for constructing this model.
 
 ```{r}
 # plot the model
@@ -275,15 +275,21 @@ confusionMatrix(as.factor(median_predict),
                 mode = "everything")
 ```
 
-From the generated confusion matrix, the most useful metrics for analysis would be the accuracy coupled with the F1 score. The goal is to have accuracy be as close to 1 as possible; therefore, with that understanding, the value of *0.9615* is very optimal. It could continue to be optimized to have the value be closer to 1, but that value would be considered "great" in terms of the model as a whole. The F1 score is a measure of the model's accuracy. The value of *0.8571* from the statistics indicates that the model is pretty accurate but similar to the accuracy, it should also be improved in order to be as close to 1 as possible.
+From the generated confusion matrix, the most useful metrics for analysis would be the accuracy coupled with the F1 score. The goal is to have accuracy be as close to 1 as possible; therefore, with that understanding, the value of *0.9231* is pretty optimal. It could continue to be optimized to have the value be closer to 1, but that value would be considered "great" in terms of the model as a whole. The F1 score is a measure of the model's accuracy. The value of *0.7500* from the statistics indicates that the model is good but not great, but similar to the accuracy, it should also be improved in order to be as close to 1 as possible.
 
 #### Evaluation 
 
-```{r, echo=FALSE, warning=FALSE, message=FALSE}
+```{r, echo=FALSE}
 # Evaluate the linear regression model
 varImp(median_mdl)
+```
+
+Relating to the model, the most important variable was 'P75th' with an overall importance of 100% when predicting the salary (median) variable. Similar to that variables, 'Unemployment_rate' and 'P25th' were also important variables that relate to the prediction of the median classifier variable, with an overall importance of approximately 85% and 78% respectively. These are viable results, given that one's percentile of earnings and the value for those who are unemployed, should all have a high influence of one's respective yearly earnings. 
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
 grid <- expand.grid(.winnow = c(TRUE,FALSE), 
-                    .trials=c(20,30,40), 
+                    .trials=c(1,10,20,30,40), 
                     .model=c("tree","rules"))
 set.seed(1984)
 median_mdl_tune <- train(x=features,
@@ -293,20 +299,22 @@ median_mdl_tune <- train(x=features,
                 method="C5.0",
                 verbose=TRUE)
 median_mdl_tune
-median_mdl
-# Want to evaluation again with the tune data using the new model 
-median_predict_tune = predict(median_mdl_tune,tune,type= "raw")
-confusionMatrix(as.factor(median_predict_tune), 
-                as.factor(tune$Over.50K), 
-                dnn=c("Prediction", "Actual"), 
-                mode = "sens_spec")
+plot(median_mdl_tune)
+```
+
+The additional model favored the minimum trials, 1, and with no winnowing. These results are graphed above for a more visual analysis. Supportive of the outputted statistics, it is shown the the blue line, indicative of no winnowing, has a consecutively larger accuracy for each set of boosting iterations. Also, it is important to note that the accuracy decreases overtime with the increase in boosting iterations. Based on this information and the previous model, it can be generealized that the minimum number of boosting iterations is the most optimal for this particular model. 
+
+
+```{r}
 #Test
 median_predict_test = predict(median_mdl_tune,test,type = "raw")
 confusionMatrix(as.factor(median_predict_test),
                 as.factor(test$Over.50K),
                 dnn=c("Prediction","Actual"),
-                mode = "sens_spec")
+                mode = "everything")
 ```
+
+In comparison to previous evaluations, this final model has a slight decrease when predicted with the test test. The original evaluation of the model had a accuracy of approximately *92.31%* and a F1 score of approximately *75%*. Even with adjusting hyper-parameters and tuning the model, the final evaluation of the model does have a very slight decrease in both accuracy (*92%*) and F1 (*66.67%*), but not a significant amount which would be less preferable. This can be attributed to the nature of the data and the inability for the model to continue to be optimized even with improving parameters.  
 
 ### Model Building Classification Random Forest
 
@@ -324,7 +332,7 @@ majors_combined_target$combined_target <-ifelse(majors_combined_target$combined_
 
 #added this a predictor versus replacing the numeric version
 (majors_combined_target$combined_target <- cut(majors_combined_target$combined_target,c(-1,0.3953488,1),labels = c(0,1)))
-majors_combined_target$combined_target <- fct_collapse(majors_combined_target$combined_target, "LE.EQ.20K"="0", "G.50K"="1")
+majors_combined_target$combined_target <- fct_collapse(majors_combined_target$combined_target, "LE.EQ.20K"="0", "G.20K"="1")
 majors_combined_target <- majors_combined_target %>%
   mutate(combined_target = factor(combined_target, labels = make.names(levels(combined_target))))
 
@@ -333,12 +341,14 @@ str(majors_combined_target)
 
 ```{r, echo=FALSE}
 #Determine the baserate or prevalence for the classifier
-
 (prevalence <- table(majors_combined_target$combined_target)[[2]]/length(majors_combined_target$combined_target))
-table(majors_combined_target$combined_target)
+# table(majors_combined_target$combined_target)
 ```
 
-```{r, echo=FALSE}
+The initial baserate for the classifier variable, median, is approximately *0.3953*, representative of the percentage of positive entries in relation to all of the entries for the median variable. When building a classifier, the lower the baserate is, the better the associated model should be at efficiently predicting the positive entries. For example, if a model had an initial baserate of 75% and a model accuracy of 50%, that would be a better fitted model than if the original baserate was 25% comparatively.
+
+```{r, include=FALSE}
+set.seed(1)
 # Split data into Train, Tune, Test
 part_index_1 <- caret::createDataPartition(majors_combined_target$combined_target,
                                            times=1,
@@ -360,6 +370,7 @@ dim(tune)
 # these are slightly off because the data set isn't perfectly even
 ```
 
+
 ```{r, echo=FALSE}
 #Calculate the initial mtry level 
 mytry_tune <- function(x){
@@ -370,9 +381,11 @@ mytry_tune <- function(x){
 mytry_tune(majors_combined_target)
 ```
 
+The mtry parameter in the random forest algorithm defines the number of variables randomly sampled as candidates for each split. The default number of this classification would be the square root of the number of variables. As indicated in the above output, the default mtry should be 4, rounded down from the 4.47 value.
+
 ```{r, include=FALSE}
 #Creating an initial random forest model with 500 trees
-set.seed(2023)
+set.seed(1)
 combined_RF = randomForest(combined_target~.,          #<- Formula: response variable ~ predictors.
                             #   The period means 'use all other variables in the data'.
                             train,     #<- A data frame with the variables to be used.
@@ -396,9 +409,21 @@ combined_RF = randomForest(combined_target~.,          #<- Formula: response var
                             keep.forest = TRUE,  #<- If set to FALSE, the forest will not be retained in the output object. If xtest is given, defaults to FALSE.
                             keep.inbag = TRUE)   #<- Should an n by ntree matrix be returned that keeps track of which samples are in-bag in which trees? 
 
-# Look at the output of the random forest.
-combined_RF
 ```
+
+```{r}
+# Look at the output of the random forest.
+combined_RF$confusion
+
+# check the accuracy of the model
+combined_RF_acc = (sum(combined_RF$confusion[row(combined_RF$confusion) ==
+                                  col(combined_RF$confusion)]) /sum(combined_RF$confusion))*100
+
+print(paste("Model Accuracy:", combined_RF_acc, "%"))
+```
+
+As indicated in the confusion matrix of the random forest model, the class error for the negative class ("LE.EQ.20K") is approximately *9.59%*. This is a considerably good value as the error is fairly close to 0. On the other hand, the positive class has an approximate class error of *25.00%*. The positive class, characterized by those earning a salary greater than 50K, is the variable being predicted so it is important that the error for that particular class is minimized as much as possible in further optimization for the model. Overall, the model is rather accurate, with an approximate accuracy of *84.057%* attributed to the low class error for the negative. As a model, it is not bad, but should be properly optimized to minimize the positive class error to avoid an increased amount of false positives and false negatives.
+
 
 ```{r, echo=FALSE}
 # Determining the number of trees that should be used 
@@ -419,36 +444,47 @@ err.rate <- as.data.frame(combined_RF$err.rate)
 
 combined_RF_error = data.frame(1:nrow(combined_RF$err.rate),
                                 combined_RF$err.rate)
-head(combined_RF_error, 10)
+
 
 colnames(combined_RF_error) = c("Number of Trees", "Out of the Box","<=20K", ">20K")
-
 combined_RF_error$Diff <- combined_RF_error$'>20K'-combined_RF_error$`<=20K`
+
+# sort OOB and "G.50K" in ascending order
+minTrees <- combined_RF_error[order(combined_RF_error[,2], combined_RF_error[,4]),]
+head(minTrees,1) # output the top result
 
 # View(combined_RF_error)
 
-# 54 Trees should be used because that amount is correlated to the minimum OOB error and >20K value. 
+# 59 Trees should be used because that amount is correlated to the minimum OOB error and >20K value. 
 ```
+After building the initial random forest algorithm, it will be helpful to use the class error rates as well as the OOB error rate to identify the most optimal number of trees to tune the model. In order to identify such a value, the respective error rates from the model were converted into a data frame that was then ordered in descending order for both the OOB column and the positive class (">20K") column. The top row should therefore contain the number of trees that encapsulates the minimum OOB error and positive class error rate for that particular algorithm. For this current algorithm, it would be benefical when optimizing to use *59* as the value for the number of trees when building the random forest model.
+
 
 ```{r, echo=FALSE}
 #Determining the right number of variables to randomly sample (the mtry parameter)
 
-str(train)
 set.seed(2)
 combined_RF_mtry = tuneRF(data.frame(train[ ,1:20]),  #<- data frame of predictor variables
                            (train[ ,21]),              #<- response vector (variables), factors for classification and continuous variable for regression
                            mtryStart = 4,                        #<- starting value of mtry, the default is the same as in the randomForest function
-                           ntreeTry = 79,                        #<- number of trees used at the tuning step, let's use the same number as we did for the random forest
+                           ntreeTry = 59,                        #<- number of trees used at the tuning step, let's use the same number as we did for the random forest
                            stepFactor = 2,                       #<- at each iteration, mtry is inflated (or deflated) by this value
                            improve = 0.05,                       #<- the improvement in OOB error must be by this much for the search to continue
                            trace = TRUE,                         #<- whether to print the progress of the search
                            plot = TRUE,                          #<- whether to plot the OOB error as a function of mtry
                            doBest = TRUE)                       #<- whether to create a random forest using the optimal mtry parameter
 
-combined_RF_mtry
-
-#Based on the output of the combined_RF_mtry, it looks like 20 variables is the right number of variables to sample becauses it has the least OOB error compared to 2,4,8, and 16. 
+#Based on the output of the combined_RF_mtry, it looks like 16 variables is the right number of variables to sample becauses it has the least OOB error compared to 2,4,8, and 20. 
 ```
+
+Similar to identifying the most optimal number of trees, the value for mtry that is correlated to the lowest possible OOB error rate would be the most beneficial to use when generating any further random forest algorithms. Based on the outputted graph, the value of *16* of mtry was more optimal when compared to the previous default of *4* for the model. The difference between the individual values for 16 and 20 for mtry are rather small but when compared to the smaller values, this will be important to make note of when optimizing the model in the future.
+
+
+```{r}
+combined_RF_mtry
+```
+
+After adjusting for the model optimizations, there has been a large decrease in the accuracy for both the positive and negative class errors. The positive class ("G.20K") has a class error of approximately *9.59%* and the negative class ("LE.EQ.20K") has a class error of approximately *8.33%*. Both values are very optimal given that they are fairly close to 0. Future adjustments can be made but that is a positive improvement to build off of.
 
 
 ```{r, include=FALSE}
@@ -461,8 +497,8 @@ combined_RF_2 = randomForest(combined_target~.,          #<- Formula: response v
                             #subset = NULL,      #<- This is unnecessary because we're using all the rows in the training data set.
                             #xtest = NULL,       #<- This is already defined in the formula by the ".".
                             #ytest = NULL,       #<- This is already defined in the formula by "PREGNANT".
-                            ntree = 54,        #<- Number of trees to grow. This should not be set to too small a number, to ensure that every input row gets classified at least a few times.
-                            mtry = 20,            #<- Number of variables randomly sampled as candidates at each split. Default number for classification is sqrt(# of variables). Default number for regression is (# of variables / 3).
+                            ntree = 59,        #<- Number of trees to grow. This should not be set to too small a number, to ensure that every input row gets classified at least a few times.
+                            mtry = 16,            #<- Number of variables randomly sampled as candidates at each split. Default number for classification is sqrt(# of variables). Default number for regression is (# of variables / 3).
                             replace = TRUE,      #<- Should sampled data points be replaced.
                             #classwt = NULL,     #<- Priors of the classes. Use this if you want to specify what proportion of the data SHOULD be in each class. This is relevant if your sample data is not completely representative of the actual population 
                             #strata = NULL,      #<- Not necessary for our purpose here.
@@ -477,11 +513,21 @@ combined_RF_2 = randomForest(combined_target~.,          #<- Formula: response v
                             keep.forest = TRUE,  #<- If set to FALSE, the forest will not be retained in the output object. If xtest is given, defaults to FALSE.
                             keep.inbag = TRUE)   #<- Should an n by ntree matrix be returned that keeps track of which samples are in-bag in which trees? 
 
-# Look at the output of the random forest.
-combined_RF_2
-
 #The sample size of the model was kept at the original value of 100, because it was found that this value minimized the class error as much as possible for both classes. When the sample size was increased or decreased, one of the class errors tends to fall, but the other rises significantly. Therefore, this is the best sample size that will minimize class errors, and prevent over or under fitting of the data.
 ```
+
+```{r}
+# Look at the output of the random forest.
+combined_RF_2$confusion
+
+# check the accuracy of the model
+combined_RF_2_acc = (sum(combined_RF_2$confusion[row(combined_RF_2$confusion) ==
+                                  col(combined_RF_2$confusion)]) /sum(combined_RF_2$confusion))*100
+
+print(paste("Model Accuracy:", combined_RF_2_acc, "%"))
+```
+
+Compared to the initial model, this current random forest model is much more optimal. The class error for both the positive and negative classes were approximately *12%*. There is a slight drawback regarding the negative class given that the previous class error was approximately *9.59%*. However, this is still favorable because the positive class decreased a large percentage and that is the variable that is being predicted, so it is therefore prioritized. Additionally, the accuracy of the model increased slightly from about *84.057%* previously to now *87.423%* which is also favorable. This increase can be attributed to the lower class error for the positive class. As a model, it still requires some improvements in order to decrease the positive class error to be as close to 0 as possible.
 
 #### Tuning
 
@@ -554,15 +600,23 @@ mdl
 # Evaluation of Model
 ```
 
-### Fairness Assessment
+### Fairness Assesment
 
-I believe that our model is fair and accounts for the singular protected class present in our dataset - women. Our dataset has a variable that accounts for the percentage of the workforce that women hold. Because of this, the models that we create are able to determine whether women are being treated fairly in the workplace or not. For example, our linear regression model is able to output that women are being paid an unfair median salary based on the amount of the market share they have. If our dataset did not have the sharewomen variable, our model would not be able to determine whether women are being paid fairly or not.
+I believe that our model is fair and accounts for the singular protected class present in our dataset - women. Our dataset has a variable that accounts for the percentage of the workforce that women hold. Because of this, the models that we create are able to determine whether women are being treated fairly in the workplace or not. For example, our linear regression model is able to output that women are being paid an unfair median salary based on the amount of the market share they have. If our dataset did not have the Sharewomen variable, our model would not be able to determine whether women are being paid fairly or not.
+
+
 ### Conclusion
 
 What can you say about the results of the methods section as it relates to your question given the limitations to your model?
 
 Our business question was how should colleges allocate money in order to optimize the amount of donation money they receive from recent graduates. In other words, based on recent graduates and their characteristics and education, what would be their predicted median salary (assuming a higher median salary leads to the student donating more money)? From the data visualization, it can be deduced that the college/university should be putting money into the majors that are under the STEM category. STEM majors have a much higher median salary, a larger range of median salary, and a lower unemployment rate. Thus, they will have more expendable income to potentially donate back to the college as alumni. From the linear regression model, 
+
+
 From the random forest model, 
+
 ### Future Recommendations
 
+What additional analysis is needed or what limited your analysis on this project?
+
 One additional piece of analysis that would benefit the report as a whole is using recently recorded data. The data that was used in this analysis was recorded from 2010-2012, so the trends that were discovered from our analysis are most likely outdated. Having new data would greatly benefit the university that wanted this report, as they would be able to adjust major categories based on newer trends rather than older ones. Another additional piece of analysis that would benefit our report would be the addition of the decision tree model. In our analysis, we included linear regression and the random forest model. However, we never include the decision tree model, which would have allowed us to see a model where the most optimal choice was made every time - since the decision tree is a greedy algorithm by nature. Including the decision tree would have made our analysis more diverse and well-rounded, as we would have had performed an analysis using three different major analytic methods. Personally, we don't believe that anything limited our analysis on the project - the dataset was easy to work with and the models that we created learned the data efficiently and effectively. 
+
