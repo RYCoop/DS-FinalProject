@@ -8,7 +8,8 @@ output:
     toc_depth: 5
     toc_float: TRUE
     tod_collapsed: TRUE
-    theme: cosmo
+    theme: 
+      bootswatch: cosmo
   editor_options:
     chunk_output_type: console
     
