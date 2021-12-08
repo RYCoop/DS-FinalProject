@@ -143,7 +143,7 @@ head(res, 3)
 
 The above confusion matrix details the correlation coefficients between all the respective variables with "Total," "Men," and "Women." The correlation coefficient is a measure of the relationship strength between two different variables, with the magnitude closest to 1 or -1 indicating there is a strong direct and/or indirect relationship. Based on the output, it is important to note the differences among the "Employed" between men and women. Comparatively, there is a stronger direct relationship between women being employed (~0.945) when compared to men (~0.878). Similarly, women are more prone to work part-time (~0.917) when compared to men (~0.894). On the other hand, when comparing the median variable, which describes the median earnings of full-time year-round workers, women tend to have a slight inverse relationship (~ -0.182) whereas men have a slight direct relationship (~0.025). This is an important dissimilarity, considering women are slightly more employed yet do not payed as much in comparison
 
-### Data Vizualization
+### Data Visualization
 
 Now, we can visualize the dataset. To do this, we used the ggplot and plot_ly packages. 
 
@@ -561,6 +561,8 @@ I believe that our model is fair and accounts for the singular protected class p
 
 What can you say about the results of the methods section as it relates to your question given the limitations to your model?
 
+Our business question was how should colleges allocate money in order to optimize the amount of donation money they receive from recent graduates. In other words, based on recent graduates and their characteristics and education, what would be their predicted median salary (assuming a higher median salary leads to the student donating more money)? From the data visualization, it can be deduced that the college/university should be putting money into the majors that are under the STEM category. STEM majors have a much higher median salary, a larger range of median salary, and a lower unemployment rate. Thus, they will have more expendable income to potentially donate back to the college as alumni. From the linear regression model, 
+From the random forest model, 
 ### Future Recommendations
 
 One additional piece of analysis that would benefit the report as a whole is using recently recorded data. The data that was used in this analysis was recorded from 2010-2012, so the trends that were discovered from our analysis are most likely outdated. Having new data would greatly benefit the university that wanted this report, as they would be able to adjust major categories based on newer trends rather than older ones. Another additional piece of analysis that would benefit our report would be the addition of the decision tree model. In our analysis, we included linear regression and the random forest model. However, we never include the decision tree model, which would have allowed us to see a model where the most optimal choice was made every time - since the decision tree is a greedy algorithm by nature. Including the decision tree would have made our analysis more diverse and well-rounded, as we would have had performed an analysis using three different major analytic methods. Personally, we don't believe that anything limited our analysis on the project - the dataset was easy to work with and the models that we created learned the data efficiently and effectively. 
