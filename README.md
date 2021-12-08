@@ -6,6 +6,9 @@ Question: Based on recent graduates and their characteristics/education, what wo
 
 Final RPubs: https://rpubs.com/RYCoop/845211
 
+Final HTML: Final_Project_New.html
+Final Rmd: Final_Project_New.Rmd
+
 # College Majors
 
 This folder contains the data and code behind the story [The Economic Guide To Picking A College Major](https://fivethirtyeight.com/features/the-economic-guide-to-picking-a-college-major/).
